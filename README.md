@@ -26,7 +26,8 @@ cp .env.example .env
 
 | Variable | Purpose |
 |----------|---------|
-| `DATABASE_URL` | PostgreSQL connection string ([Neon](https://neon.tech) free tier works locally) |
+| `POSTGRES_PRISMA_URL` | PostgreSQL pooled URL (set automatically by Vercel Postgres) |
+| `POSTGRES_URL_NON_POOLING` | Direct URL for migrations (set automatically by Vercel Postgres) |
 | `ADMIN_PASSWORD` | Studio login at `/admin` |
 | `SESSION_SECRET` | Signed session cookies |
 | `BLOB_READ_WRITE_TOKEN` | Optional locally — without it, photos save to `uploads/` |
@@ -57,7 +58,7 @@ Connect the repo in the [Vercel Dashboard](https://vercel.com/new).
 In your Vercel project:
 
 - **Storage → Create Database → Postgres** (or connect [Neon](https://neon.tech))
-- Vercel auto-adds `DATABASE_URL` to your project
+- Vercel auto-adds `POSTGRES_PRISMA_URL` and `POSTGRES_URL_NON_POOLING`
 
 ### 3. Add Blob storage
 
@@ -74,7 +75,9 @@ SESSION_SECRET=a-long-random-string
 CONTACT_PHONE=(555) 123-4567
 ```
 
-`DATABASE_URL` and `BLOB_READ_WRITE_TOKEN` are set automatically when you connect storage.
+`POSTGRES_*` and `BLOB_READ_WRITE_TOKEN` are set automatically when you connect storage.
+
+**Important:** Do not add a manual `DATABASE_URL` with placeholder values like `host:5432/dbname` — delete it from Vercel env vars if present.
 
 ### 5. Deploy
 
