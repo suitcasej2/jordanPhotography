@@ -1,11 +1,10 @@
 import { NextResponse } from "next/server";
-import { createReadStream } from "fs";
-import { stat } from "fs/promises";
-import { Readable } from "stream";
 import JSZip from "jszip";
 import { getCatalogBySlug, isCatalogExpired } from "@/lib/catalog";
 import { hasCatalogSession } from "@/lib/session";
-import { getPhotoPath } from "@/lib/uploads";
+import { readPhotoFile } from "@/lib/storage";
+
+export const maxDuration = 60;
 
 type RouteContext = {
   params: Promise<{ slug: string }>;
@@ -31,16 +30,9 @@ export async function GET(_request: Request, context: RouteContext) {
   const folder = zip.folder(catalog.title.replace(/[^\w\s-]/g, "").trim() || "photos");
 
   for (const photo of catalog.photos) {
-    const filePath = getPhotoPath(catalog.id, photo.filename);
     try {
-      const fileStat = await stat(filePath);
-      if (!fileStat.isFile()) continue;
-      const stream = createReadStream(filePath);
-      const chunks: Buffer[] = [];
-      for await (const chunk of stream) {
-        chunks.push(Buffer.from(chunk));
-      }
-      folder?.file(photo.originalName, Buffer.concat(chunks));
+      const buffer = await readPhotoFile(photo);
+      folder?.file(photo.originalName, buffer);
     } catch {
       // Skip missing files
     }

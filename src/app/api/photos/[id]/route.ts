@@ -1,29 +1,13 @@
 import { NextResponse } from "next/server";
-import { readFile } from "fs/promises";
-import path from "path";
 import { prisma } from "@/lib/db";
 import { isCatalogExpired } from "@/lib/catalog";
+import { getContentType } from "@/lib/photos";
 import { hasAdminSession, hasCatalogSession } from "@/lib/session";
-import { getPhotoPath, deleteUploadedFile } from "@/lib/uploads";
+import { deletePhotoFile, readPhotoFile } from "@/lib/storage";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
 };
-
-function getContentType(filename: string) {
-  const ext = path.extname(filename).toLowerCase();
-  switch (ext) {
-    case ".png":
-      return "image/png";
-    case ".webp":
-      return "image/webp";
-    case ".heic":
-    case ".heif":
-      return "image/heic";
-    default:
-      return "image/jpeg";
-  }
-}
 
 async function canAccessPhoto(slug: string) {
   if (await hasAdminSession()) return true;
@@ -50,8 +34,7 @@ export async function GET(_request: Request, context: RouteContext) {
   }
 
   try {
-    const filePath = getPhotoPath(photo.catalogId, photo.filename);
-    const buffer = await readFile(filePath);
+    const buffer = await readPhotoFile(photo);
 
     return new NextResponse(new Uint8Array(buffer), {
       headers: {
@@ -76,7 +59,7 @@ export async function DELETE(_request: Request, context: RouteContext) {
     return NextResponse.json({ error: "Photo not found." }, { status: 404 });
   }
 
-  await deleteUploadedFile(photo.catalogId, photo.filename);
+  await deletePhotoFile(photo);
   await prisma.photo.delete({ where: { id } });
 
   return NextResponse.json({ success: true });

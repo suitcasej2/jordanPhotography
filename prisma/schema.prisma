@@ -4,7 +4,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -30,6 +30,7 @@ model Photo {
   height       Int?
   sizeBytes    Int
   sortOrder    Int      @default(0)
+  storageUrl   String?
   createdAt    DateTime @default(now())
 
   @@index([catalogId])

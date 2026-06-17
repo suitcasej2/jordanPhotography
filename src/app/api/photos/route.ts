@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from "uuid";
 import imageSize from "image-size";
 import { prisma } from "@/lib/db";
 import { hasAdminSession } from "@/lib/session";
-import { saveUploadedFile } from "@/lib/uploads";
+import { savePhotoFile } from "@/lib/storage";
 
 const ALLOWED_TYPES = new Set([
   "image/jpeg",
@@ -53,7 +53,7 @@ export async function POST(request: Request) {
     const ext = entry.name.split(".").pop()?.toLowerCase() || "jpg";
     const filename = `${uuidv4()}.${ext}`;
 
-    await saveUploadedFile(catalogId, filename, buffer);
+    const { storageUrl } = await savePhotoFile(catalogId, filename, buffer);
 
     let width: number | undefined;
     let height: number | undefined;
@@ -74,6 +74,7 @@ export async function POST(request: Request) {
         height,
         sizeBytes: buffer.length,
         sortOrder,
+        storageUrl,
       },
     });
 

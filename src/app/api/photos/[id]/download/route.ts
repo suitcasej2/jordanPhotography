@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
-import { readFile } from "fs/promises";
 import { prisma } from "@/lib/db";
 import { isCatalogExpired } from "@/lib/catalog";
 import { hasCatalogSession } from "@/lib/session";
-import { getPhotoPath } from "@/lib/uploads";
+import { readPhotoFile } from "@/lib/storage";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -30,8 +29,7 @@ export async function GET(_request: Request, context: RouteContext) {
   }
 
   try {
-    const filePath = getPhotoPath(photo.catalogId, photo.filename);
-    const buffer = await readFile(filePath);
+    const buffer = await readPhotoFile(photo);
 
     return new NextResponse(new Uint8Array(buffer), {
       headers: {

@@ -1,25 +1,16 @@
 # Jordan Photo Share
 
-A fast, polished client gallery app for documentary photographers. Share password-protected catalogs with clients for 30 days — with smooth transitions, masonry layouts, lightbox viewing, and full-resolution downloads.
+Private client galleries for documentary photographers — password protected, 30-day expiry, grid or slideshow views, and full-resolution downloads.
 
 ## Stack
 
-- **Next.js 16** (App Router) — server components, optimized routing
-- **Framer Motion** — fluid page and gallery transitions
-- **Tailwind CSS** — editorial dark theme
-- **Prisma + SQLite** — catalog and photo metadata (swap to PostgreSQL for production)
-- **bcrypt** — password hashing
+- **Next.js 16** (App Router)
+- **PostgreSQL** + **Prisma** — gallery metadata
+- **Vercel Blob** — photo storage in production
+- **Framer Motion** — smooth gallery transitions
+- **Tailwind CSS** + **VTCDuBoisTrial**
 
-## Features
-
-- Password-protected galleries per catalog
-- Automatic 30-day expiry
-- Masonry photo grid with skeleton loading
-- Full-screen lightbox with keyboard navigation
-- Individual photo download + download all as ZIP
-- Admin studio to create galleries and upload photos
-
-## Getting Started
+## Local development
 
 1. **Install dependencies**
 
@@ -29,22 +20,25 @@ npm install
 
 2. **Configure environment**
 
-Copy `.env.example` to `.env` and update values:
-
 ```bash
 cp .env.example .env
 ```
 
-- `ADMIN_PASSWORD` — your studio login password
-- `SESSION_SECRET` — long random string for signed cookies
+| Variable | Purpose |
+|----------|---------|
+| `DATABASE_URL` | PostgreSQL connection string ([Neon](https://neon.tech) free tier works locally) |
+| `ADMIN_PASSWORD` | Studio login at `/admin` |
+| `SESSION_SECRET` | Signed session cookies |
+| `BLOB_READ_WRITE_TOKEN` | Optional locally — without it, photos save to `uploads/` |
+| `CONTACT_PHONE` | Footer booking phone number |
 
-3. **Initialize the database**
+3. **Run migrations**
 
 ```bash
-npm run db:push
+npm run db:migrate
 ```
 
-4. **Run the dev server**
+4. **Start dev server**
 
 ```bash
 npm run dev
@@ -52,37 +46,79 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000)
 
+## Deploy to Vercel
+
+### 1. Push to GitHub
+
+Connect the repo in the [Vercel Dashboard](https://vercel.com/new).
+
+### 2. Add PostgreSQL
+
+In your Vercel project:
+
+- **Storage → Create Database → Postgres** (or connect [Neon](https://neon.tech))
+- Vercel auto-adds `DATABASE_URL` to your project
+
+### 3. Add Blob storage
+
+- **Storage → Create Store → Blob**
+- Vercel auto-adds `BLOB_READ_WRITE_TOKEN`
+
+### 4. Set environment variables
+
+In **Settings → Environment Variables**, add:
+
+```env
+ADMIN_PASSWORD=your-secure-password
+SESSION_SECRET=a-long-random-string
+CONTACT_PHONE=(555) 123-4567
+```
+
+`DATABASE_URL` and `BLOB_READ_WRITE_TOKEN` are set automatically when you connect storage.
+
+### 5. Deploy
+
+The build runs:
+
+```bash
+prisma generate && prisma migrate deploy && next build
+```
+
+Migrations create the `Catalog` and `Photo` tables on first deploy.
+
+### How storage works on Vercel
+
+| Data | Where |
+|------|--------|
+| Gallery titles, passwords, expiry, photo metadata | **PostgreSQL** |
+| Full-resolution image files | **Vercel Blob** (private — served through authenticated API routes) |
+
+Locally without `BLOB_READ_WRITE_TOKEN`, photos fall back to the `uploads/` folder so you can develop without Blob.
+
 ## Usage
 
-### Studio (Admin)
+### Studio (`/admin`)
 
-1. Go to `/admin` and sign in with your `ADMIN_PASSWORD`
-2. Create a gallery with title, optional client name, and gallery password
-3. Open **Manage** to upload photos (drag & drop supported)
-4. Copy the gallery link and share it with your client along with the password
+1. Sign in with `ADMIN_PASSWORD`
+2. Create a gallery (title, client name, password)
+3. **Manage** → upload photos (drag & drop)
+4. Copy the gallery link and share with your client
 
-### Client Experience
+### Client gallery (`/gallery/{slug}`)
 
-1. Client visits `/gallery/your-slug`
-2. Enters the gallery password
-3. Browses photos in a masonry grid, opens lightbox, downloads individually or all at once
-4. Gallery expires automatically after 30 days
+1. Enter gallery password
+2. Browse in grid or slideshow view
+3. Download individual photos or all as ZIP
+4. Gallery expires after 30 days
 
-## Project Structure
+## Project structure
 
 ```
 src/
-  app/              # Pages and API routes
-  components/       # Gallery, admin, and UI components
-  lib/              # Database, sessions, catalog helpers
-  generated/prisma/ # Prisma client (generated)
-uploads/            # Photo files (gitignored)
+  app/              Pages and API routes
+  components/       Gallery, admin, UI
+  lib/              db, storage, auth, config
+prisma/
+  migrations/       PostgreSQL schema migrations
+uploads/            Local dev photo fallback (gitignored)
 ```
-
-## Production Notes
-
-- Switch `DATABASE_URL` to PostgreSQL for production hosting
-- Store uploads on S3 or similar object storage for scale
-- Set strong `ADMIN_PASSWORD` and `SESSION_SECRET`
-- Deploy on Vercel, Railway, or any Node.js host
-# jordanPhotography
