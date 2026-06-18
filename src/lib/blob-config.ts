@@ -23,23 +23,36 @@ export function getBlobStoreId() {
   return readEnv("BLOB_STORE_ID") ?? findEnvEndingWith("BLOB_STORE_ID");
 }
 
+export function getBlobWebhookPublicKey() {
+  return (
+    readEnv("BLOB_WEBHOOK_PUBLIC_KEY") ??
+    findEnvEndingWith("BLOB_WEBHOOK_PUBLIC_KEY")
+  );
+}
+
 export function hasBlobOidcAuth() {
   return Boolean(readEnv("VERCEL_OIDC_TOKEN") && getBlobStoreId());
 }
 
-/** Browser uploads require a read-write token for handleUpload. */
+/** OIDC stores use presigned browser uploads (no long-lived token required). */
+export function usesPresignedClientUpload() {
+  return Boolean(hasBlobOidcAuth() && getBlobWebhookPublicKey());
+}
+
+/** Browser uploads work with OIDC presigned URLs or a read-write token. */
 export function isDirectBlobUploadEnabled() {
-  return Boolean(getBlobReadWriteToken());
+  return usesPresignedClientUpload() || Boolean(getBlobReadWriteToken());
 }
 
 /** Server-side Blob reads/writes work with OIDC or a read-write token. */
 export function isBlobStorageEnabled() {
-  return isDirectBlobUploadEnabled() || hasBlobOidcAuth();
+  return isDirectBlobUploadEnabled();
 }
 
 export function getBlobStorageStatus() {
   const readWriteToken = getBlobReadWriteToken();
   const storeConnected = Boolean(getBlobStoreId() || readWriteToken);
+  const presignedUpload = usesPresignedClientUpload();
 
   return {
     blobConfigured: isBlobStorageEnabled(),
@@ -47,5 +60,11 @@ export function getBlobStorageStatus() {
     storeConnected,
     hasReadWriteToken: Boolean(readWriteToken),
     hasOidcAuth: hasBlobOidcAuth(),
+    hasWebhookPublicKey: Boolean(getBlobWebhookPublicKey()),
+    uploadMode: presignedUpload
+      ? ("presigned" as const)
+      : readWriteToken
+        ? ("legacy" as const)
+        : null,
   };
 }

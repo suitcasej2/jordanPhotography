@@ -13,7 +13,7 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         error:
-          "BLOB_READ_WRITE_TOKEN is missing. Connect your Blob store to this Vercel project, then redeploy.",
+          "Blob storage is not connected. Link jordan-photography-blob to this project in Vercel, then redeploy.",
       },
       { status: 404 },
     );

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { upload } from "@vercel/blob/client";
+import { upload, uploadPresigned } from "@vercel/blob/client";
 import { MotionButton } from "@/components/motion/FadeIn";
 import { readJsonResponse } from "@/lib/fetch-json";
 import {
@@ -17,6 +17,8 @@ type StorageStatus = {
   storeConnected?: boolean;
   hasReadWriteToken?: boolean;
   hasOidcAuth?: boolean;
+  hasWebhookPublicKey?: boolean;
+  uploadMode?: "presigned" | "legacy" | null;
 };
 
 function getStorageWarning(status: StorageStatus | null) {
@@ -24,15 +26,15 @@ function getStorageWarning(status: StorageStatus | null) {
     return null;
   }
 
-  if (!status.storeConnected && !status.hasReadWriteToken) {
-    return "Connect your Blob store to this Vercel project: Project → Settings → Storage → Connect Store → jordan-photography-blob. Then redeploy.";
+  if (!status.storeConnected) {
+    return "Connect jordan-photography-blob to this project: Vercel project → Settings → Storage → Connect Store. Then redeploy.";
   }
 
-  if (!status.hasReadWriteToken) {
-    return "Blob is connected, but BLOB_READ_WRITE_TOKEN is missing. In Vercel, open the Blob store, connect it to this project with the read-write token enabled, then redeploy.";
+  if (status.hasOidcAuth && !status.hasWebhookPublicKey) {
+    return "Blob is partially connected. Redeploy after linking the store so BLOB_WEBHOOK_PUBLIC_KEY is available.";
   }
 
-  return "Blob storage is not ready for large uploads yet. Redeploy after connecting the store.";
+  return "Blob storage is not ready for uploads yet. Redeploy after connecting the store.";
 }
 
 type UploadedPhoto = {
@@ -80,6 +82,9 @@ export function PhotoUploader({
   const [progress, setProgress] = useState<string | null>(null);
   const [directUpload, setDirectUpload] = useState<boolean | null>(null);
   const [storageStatus, setStorageStatus] = useState<StorageStatus | null>(null);
+  const [uploadMode, setUploadMode] = useState<"presigned" | "legacy" | null>(
+    null,
+  );
 
   useEffect(() => {
     void (async () => {
@@ -96,6 +101,7 @@ export function PhotoUploader({
         const data = await readJsonResponse<StorageStatus>(response);
         setDirectUpload(Boolean(data.directUpload));
         setStorageStatus(data);
+        setUploadMode(data.uploadMode ?? null);
       } catch {
         setDirectUpload(false);
         setStorageStatus(null);
@@ -153,9 +159,8 @@ export function PhotoUploader({
 
         const filename = `${crypto.randomUUID()}.${getPhotoExtension(file.name)}`;
         const pathname = getBlobPhotoPathname(catalogId, filename);
-
-        const blob = await upload(pathname, file, {
-          access: "private",
+        const uploadOptions = {
+          access: "private" as const,
           handleUploadUrl: "/api/photos/upload",
           multipart: file.size > 8 * 1024 * 1024,
           clientPayload: JSON.stringify({
@@ -163,7 +168,12 @@ export function PhotoUploader({
             originalName: file.name,
             filename,
           }),
-        });
+        };
+
+        const blob =
+          uploadMode === "presigned"
+            ? await uploadPresigned(pathname, file, uploadOptions)
+            : await upload(pathname, file, uploadOptions);
 
         const dimensions = await readImageDimensions(file);
 
@@ -192,7 +202,7 @@ export function PhotoUploader({
 
       return uploadedCount;
     },
-    [catalogId],
+    [catalogId, uploadMode],
   );
 
   const uploadFiles = useCallback(
@@ -214,7 +224,7 @@ export function PhotoUploader({
         if (tooLarge) {
           setProgress(
             storageWarning ??
-              "Vercel Blob is not configured. Connect your Blob store and set BLOB_READ_WRITE_TOKEN to upload large photos.",
+              "Blob storage is not connected. Link your Blob store in Vercel, then redeploy.",
           );
           return;
         }

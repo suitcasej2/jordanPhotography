@@ -1,44 +1,25 @@
-import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
-import { NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
 import {
-  ALLOWED_PHOTO_TYPES,
-  getBlobPhotoPathname,
-  getPhotoExtension,
-} from "@/lib/photos/upload";
-import { getBlobReadWriteToken } from "@/lib/blob-config";
+  handleUpload,
+  handleUploadPresigned,
+  type HandleUploadBody,
+  type HandleUploadPresignedBody,
+} from "@vercel/blob/client";
+import { issueSignedToken } from "@vercel/blob";
+import { NextResponse } from "next/server";
+import {
+  getBlobReadWriteToken,
+  usesPresignedClientUpload,
+} from "@/lib/blob-config";
+import { validateUploadRequest } from "@/lib/photos/blob-upload-auth";
 import { hasAdminSession } from "@/lib/session";
 import { isDirectBlobUploadEnabled } from "@/lib/storage";
-
-type UploadClientPayload = {
-  catalogId: string;
-  originalName: string;
-  filename: string;
-};
-
-function parseClientPayload(clientPayload: string | null): UploadClientPayload {
-  if (!clientPayload) {
-    throw new Error("Missing upload metadata.");
-  }
-
-  const payload = JSON.parse(clientPayload) as Partial<UploadClientPayload>;
-  if (!payload.catalogId || !payload.originalName || !payload.filename) {
-    throw new Error("Invalid upload metadata.");
-  }
-
-  return {
-    catalogId: payload.catalogId,
-    originalName: payload.originalName,
-    filename: payload.filename,
-  };
-}
 
 export async function POST(request: Request) {
   if (!isDirectBlobUploadEnabled()) {
     return NextResponse.json(
       {
         error:
-          "BLOB_READ_WRITE_TOKEN is missing. Connect your Blob store to this Vercel project, then redeploy.",
+          "Blob storage is not connected. Link jordan-photography-blob to this project in Vercel, then redeploy.",
       },
       { status: 404 },
     );
@@ -48,11 +29,53 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }
 
-  const body = (await request.json()) as HandleUploadBody;
+  const body = (await request.json()) as
+    | HandleUploadBody
+    | HandleUploadPresignedBody;
 
   try {
+    if (usesPresignedClientUpload()) {
+      const jsonResponse = await handleUploadPresigned({
+        body: body as HandleUploadPresignedBody,
+        request,
+        getSignedToken: async (pathname, clientPayload) => {
+          if (!(await hasAdminSession())) {
+            throw new Error("Unauthorized.");
+          }
+
+          const upload = await validateUploadRequest(pathname, clientPayload);
+          const token = await issueSignedToken({
+            pathname,
+            operations: ["put"],
+            allowedContentTypes: upload.allowedContentTypes,
+            maximumSizeInBytes: upload.maximumSizeInBytes,
+            validUntil: upload.validUntil,
+          });
+
+          return {
+            token,
+            urlOptions: {
+              allowedContentTypes: upload.allowedContentTypes,
+              maximumSizeInBytes: upload.maximumSizeInBytes,
+              validUntil: upload.validUntil,
+              addRandomSuffix: false,
+              tokenPayload: JSON.stringify(upload.payload),
+            },
+          };
+        },
+      });
+
+      if (jsonResponse.type === "blob.generate-presigned-url") {
+        return NextResponse.json({
+          presignedUrlPayload: jsonResponse.presignedUrlPayload,
+        });
+      }
+
+      return NextResponse.json(jsonResponse);
+    }
+
     const jsonResponse = await handleUpload({
-      body,
+      body: body as HandleUploadBody,
       request,
       token: getBlobReadWriteToken(),
       onBeforeGenerateToken: async (pathname, clientPayload) => {
@@ -60,34 +83,13 @@ export async function POST(request: Request) {
           throw new Error("Unauthorized.");
         }
 
-        const payload = parseClientPayload(clientPayload);
-        const expectedPathname = getBlobPhotoPathname(
-          payload.catalogId,
-          payload.filename,
-        );
-
-        if (pathname !== expectedPathname) {
-          throw new Error("Invalid upload path.");
-        }
-
-        const catalog = await prisma.catalog.findUnique({
-          where: { id: payload.catalogId },
-          select: { id: true },
-        });
-        if (!catalog) {
-          throw new Error("Catalog not found.");
-        }
-
-        const ext = getPhotoExtension(payload.originalName);
-        if (!["jpg", "jpeg", "png", "webp", "heic", "heif"].includes(ext)) {
-          throw new Error("Unsupported file type.");
-        }
+        const upload = await validateUploadRequest(pathname, clientPayload);
 
         return {
-          allowedContentTypes: Array.from(ALLOWED_PHOTO_TYPES),
-          maximumSizeInBytes: 50 * 1024 * 1024,
+          allowedContentTypes: upload.allowedContentTypes,
+          maximumSizeInBytes: upload.maximumSizeInBytes,
           addRandomSuffix: false,
-          tokenPayload: JSON.stringify(payload),
+          tokenPayload: JSON.stringify(upload.payload),
         };
       },
     });
