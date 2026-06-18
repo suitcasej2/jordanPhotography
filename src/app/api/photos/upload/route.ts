@@ -6,8 +6,9 @@ import {
   getBlobPhotoPathname,
   getPhotoExtension,
 } from "@/lib/photos/upload";
+import { getBlobReadWriteToken } from "@/lib/blob-config";
 import { hasAdminSession } from "@/lib/session";
-import { isBlobStorageEnabled } from "@/lib/storage";
+import { isDirectBlobUploadEnabled } from "@/lib/storage";
 
 type UploadClientPayload = {
   catalogId: string;
@@ -33,9 +34,12 @@ function parseClientPayload(clientPayload: string | null): UploadClientPayload {
 }
 
 export async function POST(request: Request) {
-  if (!isBlobStorageEnabled()) {
+  if (!isDirectBlobUploadEnabled()) {
     return NextResponse.json(
-      { error: "Direct uploads are not enabled." },
+      {
+        error:
+          "BLOB_READ_WRITE_TOKEN is missing. Connect your Blob store to this Vercel project, then redeploy.",
+      },
       { status: 404 },
     );
   }
@@ -50,6 +54,7 @@ export async function POST(request: Request) {
     const jsonResponse = await handleUpload({
       body,
       request,
+      token: getBlobReadWriteToken(),
       onBeforeGenerateToken: async (pathname, clientPayload) => {
         if (!(await hasAdminSession())) {
           throw new Error("Unauthorized.");

@@ -11,6 +11,30 @@ import {
   isAllowedPhotoFile,
 } from "@/lib/photos/upload";
 
+type StorageStatus = {
+  directUpload?: boolean;
+  blobConfigured?: boolean;
+  storeConnected?: boolean;
+  hasReadWriteToken?: boolean;
+  hasOidcAuth?: boolean;
+};
+
+function getStorageWarning(status: StorageStatus | null) {
+  if (!status || status.directUpload) {
+    return null;
+  }
+
+  if (!status.storeConnected && !status.hasReadWriteToken) {
+    return "Connect your Blob store to this Vercel project: Project → Settings → Storage → Connect Store → jordan-photography-blob. Then redeploy.";
+  }
+
+  if (!status.hasReadWriteToken) {
+    return "Blob is connected, but BLOB_READ_WRITE_TOKEN is missing. In Vercel, open the Blob store, connect it to this project with the read-write token enabled, then redeploy.";
+  }
+
+  return "Blob storage is not ready for large uploads yet. Redeploy after connecting the store.";
+}
+
 type UploadedPhoto = {
   id: string;
   originalName: string;
@@ -55,7 +79,7 @@ export function PhotoUploader({
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState<string | null>(null);
   const [directUpload, setDirectUpload] = useState<boolean | null>(null);
-  const [blobConfigured, setBlobConfigured] = useState<boolean | null>(null);
+  const [storageStatus, setStorageStatus] = useState<StorageStatus | null>(null);
 
   useEffect(() => {
     void (async () => {
@@ -65,22 +89,21 @@ export function PhotoUploader({
         });
         if (!response.ok) {
           setDirectUpload(false);
-          setBlobConfigured(false);
+          setStorageStatus(null);
           return;
         }
 
-        const data = await readJsonResponse<{
-          directUpload?: boolean;
-          blobConfigured?: boolean;
-        }>(response);
+        const data = await readJsonResponse<StorageStatus>(response);
         setDirectUpload(Boolean(data.directUpload));
-        setBlobConfigured(Boolean(data.blobConfigured));
+        setStorageStatus(data);
       } catch {
         setDirectUpload(false);
-        setBlobConfigured(false);
+        setStorageStatus(null);
       }
     })();
   }, []);
+
+  const storageWarning = getStorageWarning(storageStatus);
 
   const uploadViaServer = useCallback(
     async (files: File[]) => {
@@ -184,11 +207,14 @@ export function PhotoUploader({
         return;
       }
 
-      if (!directUpload && blobConfigured === false) {
-        const tooLarge = fileArray.some((file) => file.size > SERVER_UPLOAD_LIMIT_BYTES);
+      if (!directUpload) {
+        const tooLarge = fileArray.some(
+          (file) => file.size > SERVER_UPLOAD_LIMIT_BYTES,
+        );
         if (tooLarge) {
           setProgress(
-            "Vercel Blob is not configured. Add Blob storage in Vercel and set BLOB_READ_WRITE_TOKEN to upload large photos.",
+            storageWarning ??
+              "Vercel Blob is not configured. Connect your Blob store and set BLOB_READ_WRITE_TOKEN to upload large photos.",
           );
           return;
         }
@@ -211,16 +237,13 @@ export function PhotoUploader({
         setTimeout(() => setProgress(null), 6000);
       }
     },
-    [blobConfigured, directUpload, onUploaded, uploadViaBlob, uploadViaServer],
+    [directUpload, onUploaded, storageWarning, uploadViaBlob, uploadViaServer],
   );
 
   return (
     <div className="space-y-4">
-      {blobConfigured === false ? (
-        <p className="text-sm text-amber-400/90">
-          Blob storage is not configured. Large uploads will fail until{" "}
-          <code className="text-xs">BLOB_READ_WRITE_TOKEN</code> is set in Vercel.
-        </p>
+      {storageWarning ? (
+        <p className="text-sm text-amber-400/90">{storageWarning}</p>
       ) : null}
 
       <motion.label

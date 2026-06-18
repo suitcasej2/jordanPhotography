@@ -6,12 +6,15 @@ import {
   isAllowedPhotoFile,
 } from "@/lib/photos/upload";
 import { hasAdminSession } from "@/lib/session";
-import { isBlobStorageEnabled } from "@/lib/storage";
+import { isDirectBlobUploadEnabled } from "@/lib/storage";
 
 export async function POST(request: Request) {
-  if (!isBlobStorageEnabled()) {
+  if (!isDirectBlobUploadEnabled()) {
     return NextResponse.json(
-      { error: "Direct uploads are not enabled." },
+      {
+        error:
+          "BLOB_READ_WRITE_TOKEN is missing. Connect your Blob store to this Vercel project, then redeploy.",
+      },
       { status: 404 },
     );
   }

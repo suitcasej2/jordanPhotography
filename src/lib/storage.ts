@@ -1,16 +1,12 @@
 import { del, get, put } from "@vercel/blob";
 import { mkdir, unlink, writeFile, readFile } from "fs/promises";
 import path from "path";
+import {
+  getBlobReadWriteToken,
+  isBlobStorageEnabled,
+} from "@/lib/blob-config";
 import type { PhotoStorageRecord } from "@/lib/photos";
 import { UPLOAD_DIR } from "@/lib/constants";
-
-function getBlobToken() {
-  return process.env.BLOB_READ_WRITE_TOKEN?.trim();
-}
-
-function useBlobStorage() {
-  return Boolean(getBlobToken());
-}
 
 function getUploadRoot() {
   return path.join(/* turbopackIgnore: true */ process.cwd(), UPLOAD_DIR);
@@ -24,6 +20,11 @@ function getBlobPathname(catalogId: string, filename: string) {
   return `catalogs/${catalogId}/${filename}`;
 }
 
+function getBlobAuthOptions() {
+  const token = getBlobReadWriteToken();
+  return token ? { token } : {};
+}
+
 async function ensureLocalCatalogDir(catalogId: string) {
   await mkdir(path.join(getUploadRoot(), catalogId), { recursive: true });
 }
@@ -33,11 +34,11 @@ export async function savePhotoFile(
   filename: string,
   buffer: Buffer,
 ): Promise<{ storageUrl: string | null }> {
-  if (useBlobStorage()) {
+  if (isBlobStorageEnabled()) {
     const blob = await put(getBlobPathname(catalogId, filename), buffer, {
       access: "private",
       addRandomSuffix: false,
-      token: getBlobToken(),
+      ...getBlobAuthOptions(),
     });
     return { storageUrl: blob.url };
   }
@@ -51,7 +52,7 @@ export async function readPhotoFile(photo: PhotoStorageRecord): Promise<Buffer> 
   if (photo.storageUrl) {
     const result = await get(photo.storageUrl, {
       access: "private",
-      token: getBlobToken(),
+      ...getBlobAuthOptions(),
     });
 
     if (!result?.stream) {
@@ -66,7 +67,7 @@ export async function readPhotoFile(photo: PhotoStorageRecord): Promise<Buffer> 
 
 export async function deletePhotoFile(photo: PhotoStorageRecord) {
   if (photo.storageUrl) {
-    await del(photo.storageUrl, { token: getBlobToken() });
+    await del(photo.storageUrl, getBlobAuthOptions());
     return;
   }
 
@@ -77,6 +78,9 @@ export async function deletePhotoFile(photo: PhotoStorageRecord) {
   }
 }
 
-export function isBlobStorageEnabled() {
-  return useBlobStorage();
-}
+export {
+  getBlobReadWriteToken,
+  getBlobStorageStatus,
+  isBlobStorageEnabled,
+  isDirectBlobUploadEnabled,
+} from "@/lib/blob-config";
