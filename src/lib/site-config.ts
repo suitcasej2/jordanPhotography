@@ -4,5 +4,9 @@ export const siteConfig = {
   bookingHeadline: "Available for bookings",
   bookingMessage:
     "Events, workshops, and editorial work — reach out to discuss your project.",
-  phone: process.env.CONTACT_PHONE ?? "",
+  phone: "+34 711 01 29 97",
+  instagram: {
+    handle: "@soundsbyjali",
+    url: "https://www.instagram.com/soundsbyjali/",
+  },
 };

@@ -2,7 +2,8 @@ import Link from "next/link";
 import { siteConfig } from "@/lib/site-config";
 
 export function BookingFooter() {
-  const { bookingHeadline, bookingMessage, phone, photographerName } = siteConfig;
+  const { bookingHeadline, bookingMessage, phone, instagram, photographerName } =
+    siteConfig;
 
   return (
     <footer className="border-t border-border/60 bg-background">
@@ -17,14 +18,22 @@ export function BookingFooter() {
           <p className="mt-3 text-sm leading-relaxed text-muted">{bookingMessage}</p>
         </div>
 
-        {phone ? (
+        <div className="flex flex-col gap-3 sm:items-end">
           <a
-            href={`tel:${phone.replace(/\s/g, "")}`}
+            href={`tel:${phone.replace(/\D/g, "")}`}
             className="text-lg tracking-[0.04em] text-foreground transition hover:text-accent"
           >
             {phone}
           </a>
-        ) : null}
+          <a
+            href={instagram.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sm tracking-[0.08em] text-muted transition hover:text-accent"
+          >
+            {instagram.handle}
+          </a>
+        </div>
       </div>
 
       <div className="border-t border-border/40 px-6 py-5">

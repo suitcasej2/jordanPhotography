@@ -31,7 +31,8 @@ cp .env.example .env
 | `ADMIN_PASSWORD` | Studio login at `/admin` |
 | `SESSION_SECRET` | Signed session cookies |
 | `BLOB_READ_WRITE_TOKEN` | Optional locally — without it, photos save to `uploads/` |
-| `CONTACT_PHONE` | Footer booking phone number |
+
+Footer phone and Instagram are configured in `src/lib/site-config.ts`.
 
 3. **Run migrations**
 
@@ -67,7 +68,6 @@ In **Settings → Environment Variables**, add:
 ```env
 ADMIN_PASSWORD=your-secure-password
 SESSION_SECRET=a-long-random-string
-CONTACT_PHONE=(555) 123-4567
 ```
 
 ### 5. Add Blob storage
