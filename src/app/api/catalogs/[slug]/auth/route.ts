@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { getCatalogBySlug, isCatalogExpired } from "@/lib/catalog";
-import { setCatalogSession } from "@/lib/session";
+import { attachCatalogSessionCookie } from "@/lib/session";
 
 type RouteContext = {
   params: Promise<{ slug: string }>;
@@ -34,7 +34,7 @@ export async function POST(request: Request, context: RouteContext) {
     return NextResponse.json({ error: "Incorrect password." }, { status: 401 });
   }
 
-  await setCatalogSession(slug, catalog.expiresAt);
-
-  return NextResponse.json({ success: true });
+  const response = NextResponse.json({ success: true });
+  attachCatalogSessionCookie(response, slug, catalog.expiresAt);
+  return response;
 }

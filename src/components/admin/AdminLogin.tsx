@@ -2,8 +2,13 @@
 
 import { useState } from "react";
 import { FadeIn, MotionButton } from "@/components/motion/FadeIn";
+import type { AdminLoadResult } from "@/components/admin/AdminDashboard";
 
-export function AdminLogin({ onSuccess }: { onSuccess: () => Promise<boolean> }) {
+export function AdminLogin({
+  onSuccess,
+}: {
+  onSuccess: () => Promise<AdminLoadResult>;
+}) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -26,9 +31,9 @@ export function AdminLogin({ onSuccess }: { onSuccess: () => Promise<boolean> })
         return;
       }
 
-      const loaded = await onSuccess();
-      if (!loaded) {
-        setError("Signed in, but the dashboard failed to load. Refresh and try again.");
+      const result = await onSuccess();
+      if (!result.ok) {
+        setError(result.error);
       }
     } catch {
       setError("Unable to sign in.");

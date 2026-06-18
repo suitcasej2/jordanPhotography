@@ -17,25 +17,33 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }
 
-  const catalogs = await prisma.catalog.findMany({
-    orderBy: { createdAt: "desc" },
-    include: {
-      _count: { select: { photos: true } },
-    },
-  });
+  try {
+    const catalogs = await prisma.catalog.findMany({
+      orderBy: { createdAt: "desc" },
+      include: {
+        _count: { select: { photos: true } },
+      },
+    });
 
-  return NextResponse.json(
-    catalogs.map((catalog) => ({
-      id: catalog.id,
-      slug: catalog.slug,
-      title: catalog.title,
-      clientName: catalog.clientName,
-      expiresAt: catalog.expiresAt.toISOString(),
-      createdAt: catalog.createdAt.toISOString(),
-      photoCount: catalog._count.photos,
-      isExpired: catalog.expiresAt.getTime() <= Date.now(),
-    })),
-  );
+    return NextResponse.json(
+      catalogs.map((catalog) => ({
+        id: catalog.id,
+        slug: catalog.slug,
+        title: catalog.title,
+        clientName: catalog.clientName,
+        expiresAt: catalog.expiresAt.toISOString(),
+        createdAt: catalog.createdAt.toISOString(),
+        photoCount: catalog._count.photos,
+        isExpired: catalog.expiresAt.getTime() <= Date.now(),
+      })),
+    );
+  } catch (error) {
+    console.error("Failed to load catalogs:", error);
+    return NextResponse.json(
+      { error: "Database unavailable. Check DB_POSTGRES_URL and DB_PRISMA_DATABASE_URL." },
+      { status: 503 },
+    );
+  }
 }
 
 export async function POST(request: Request) {

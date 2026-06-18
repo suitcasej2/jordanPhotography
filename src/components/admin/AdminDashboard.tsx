@@ -8,40 +8,59 @@ import { CreateCatalogForm } from "@/components/admin/CreateCatalogForm";
 import { FadeIn } from "@/components/motion/FadeIn";
 import { PageLoader } from "@/components/ui/Loader";
 
+export type AdminLoadResult =
+  | { ok: true }
+  | { ok: false; error: string };
+
 export function AdminDashboard() {
   const [authenticated, setAuthenticated] = useState<boolean | null>(null);
   const [catalogs, setCatalogs] = useState<AdminCatalog[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [sessionChecked, setSessionChecked] = useState(false);
 
-  const loadCatalogs = useCallback(async (): Promise<boolean> => {
-    setLoading(true);
+  const loadCatalogs = useCallback(async (): Promise<AdminLoadResult> => {
     try {
       const response = await fetch("/api/catalogs", { credentials: "include" });
+
       if (response.status === 401) {
         setAuthenticated(false);
-        return false;
+        return {
+          ok: false,
+          error:
+            "Signed in, but the session cookie was not saved. Try again or check browser cookie settings.",
+        };
       }
+
       if (!response.ok) {
         setAuthenticated(false);
-        return false;
+        const body = (await response.json().catch(() => null)) as
+          | { error?: string }
+          | null;
+        return {
+          ok: false,
+          error:
+            body?.error ??
+            "Could not load galleries. Check the database connection.",
+        };
       }
+
       const data = (await response.json()) as AdminCatalog[];
       setCatalogs(data);
       setAuthenticated(true);
-      return true;
+      return { ok: true };
     } catch {
       setAuthenticated(false);
-      return false;
-    } finally {
-      setLoading(false);
+      return {
+        ok: false,
+        error: "Network error while loading galleries. Try again.",
+      };
     }
   }, []);
 
   useEffect(() => {
-    void loadCatalogs();
+    void loadCatalogs().finally(() => setSessionChecked(true));
   }, [loadCatalogs]);
 
-  if (authenticated === null || loading) {
+  if (!sessionChecked) {
     return <PageLoader />;
   }
 

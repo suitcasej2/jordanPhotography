@@ -1,9 +1,29 @@
 import { createHmac, timingSafeEqual } from "crypto";
 import { cookies } from "next/headers";
+import type { NextResponse } from "next/server";
 import {
   ADMIN_AUTH_COOKIE,
   CATALOG_AUTH_COOKIE_PREFIX,
 } from "@/lib/constants";
+
+type SessionCookieOptions = {
+  httpOnly: true;
+  secure: boolean;
+  sameSite: "lax";
+  path: string;
+  maxAge?: number;
+  expires?: Date;
+};
+
+function sessionCookieOptions(expires?: Date): SessionCookieOptions {
+  return {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    ...(expires ? { expires } : { maxAge: 7 * 24 * 60 * 60 }),
+  };
+}
 
 function getSecret() {
   return process.env.SESSION_SECRET ?? "dev-secret-change-me";
@@ -51,17 +71,28 @@ export function catalogAuthCookieName(slug: string) {
   return `${CATALOG_AUTH_COOKIE_PREFIX}${slug}`;
 }
 
+function buildCatalogSessionCookie(slug: string, catalogExpiresAt: Date) {
+  const token = createToken(slug, catalogExpiresAt.getTime());
+  return {
+    name: catalogAuthCookieName(slug),
+    value: token,
+    options: sessionCookieOptions(catalogExpiresAt),
+  };
+}
+
+export function attachCatalogSessionCookie(
+  response: NextResponse,
+  slug: string,
+  catalogExpiresAt: Date,
+) {
+  const { name, value, options } = buildCatalogSessionCookie(slug, catalogExpiresAt);
+  response.cookies.set(name, value, options);
+}
+
 export async function setCatalogSession(slug: string, catalogExpiresAt: Date) {
   const cookieStore = await cookies();
-  const token = createToken(slug, catalogExpiresAt.getTime());
-
-  cookieStore.set(catalogAuthCookieName(slug), token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    expires: catalogExpiresAt,
-  });
+  const { name, value, options } = buildCatalogSessionCookie(slug, catalogExpiresAt);
+  cookieStore.set(name, value, options);
 }
 
 export async function hasCatalogSession(slug: string) {
@@ -71,18 +102,25 @@ export async function hasCatalogSession(slug: string) {
   return verifyToken(token, slug);
 }
 
-export async function setAdminSession() {
-  const cookieStore = await cookies();
+function buildAdminSessionCookie() {
   const expiresAt = Date.now() + 7 * 24 * 60 * 60 * 1000;
   const token = createToken("admin", expiresAt);
+  return {
+    name: ADMIN_AUTH_COOKIE,
+    value: token,
+    options: sessionCookieOptions(),
+  };
+}
 
-  cookieStore.set(ADMIN_AUTH_COOKIE, token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: 7 * 24 * 60 * 60,
-  });
+export function attachAdminSessionCookie(response: NextResponse) {
+  const { name, value, options } = buildAdminSessionCookie();
+  response.cookies.set(name, value, options);
+}
+
+export async function setAdminSession() {
+  const cookieStore = await cookies();
+  const { name, value, options } = buildAdminSessionCookie();
+  cookieStore.set(name, value, options);
 }
 
 export async function hasAdminSession() {
