@@ -4,15 +4,7 @@ import imageSize from "image-size";
 import { prisma } from "@/lib/db";
 import { hasAdminSession } from "@/lib/session";
 import { savePhotoFile } from "@/lib/storage";
-
-const ALLOWED_TYPES = new Set([
-  "image/jpeg",
-  "image/jpg",
-  "image/png",
-  "image/webp",
-  "image/heic",
-  "image/heif",
-]);
+import { getPhotoExtension, isAllowedPhotoFile } from "@/lib/photos/upload";
 
 export async function POST(request: Request) {
   if (!(await hasAdminSession())) {
@@ -45,12 +37,12 @@ export async function POST(request: Request) {
 
   for (const entry of files) {
     if (!(entry instanceof File)) continue;
-    if (!ALLOWED_TYPES.has(entry.type) && !entry.name.match(/\.(jpe?g|png|webp|heic|heif)$/i)) {
+    if (!isAllowedPhotoFile(entry.name, entry.type)) {
       continue;
     }
 
     const buffer = Buffer.from(await entry.arrayBuffer());
-    const ext = entry.name.split(".").pop()?.toLowerCase() || "jpg";
+    const ext = getPhotoExtension(entry.name);
     const filename = `${uuidv4()}.${ext}`;
 
     const { storageUrl } = await savePhotoFile(catalogId, filename, buffer);

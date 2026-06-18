@@ -1,14 +1,35 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { motion } from "framer-motion";
+import { upload } from "@vercel/blob/client";
 import { MotionButton } from "@/components/motion/FadeIn";
+import {
+  getBlobPhotoPathname,
+  getPhotoExtension,
+  isAllowedPhotoFile,
+} from "@/lib/photos/upload";
 
 type UploadedPhoto = {
   id: string;
   originalName: string;
   url: string;
 };
+
+async function readImageDimensions(file: File) {
+  if (!file.type.startsWith("image/")) {
+    return { width: undefined, height: undefined };
+  }
+
+  try {
+    const bitmap = await createImageBitmap(file);
+    const dimensions = { width: bitmap.width, height: bitmap.height };
+    bitmap.close();
+    return dimensions;
+  } catch {
+    return { width: undefined, height: undefined };
+  }
+}
 
 export function PhotoUploader({
   catalogId,
@@ -20,47 +41,140 @@ export function PhotoUploader({
   const [dragging, setDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState<string | null>(null);
+  const [directUpload, setDirectUpload] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const response = await fetch("/api/admin/storage", {
+          credentials: "include",
+        });
+        if (!response.ok) {
+          setDirectUpload(false);
+          return;
+        }
+
+        const data = (await response.json()) as { directUpload?: boolean };
+        setDirectUpload(Boolean(data.directUpload));
+      } catch {
+        setDirectUpload(false);
+      }
+    })();
+  }, []);
+
+  const uploadViaServer = useCallback(
+    async (files: File[]) => {
+      const formData = new FormData();
+      formData.append("catalogId", catalogId);
+      for (const file of files) {
+        formData.append("files", file);
+      }
+
+      const response = await fetch("/api/photos", {
+        method: "POST",
+        credentials: "include",
+        body: formData,
+      });
+      const data = (await response.json()) as {
+        count: number;
+        uploaded: UploadedPhoto[];
+        error?: string;
+      };
+
+      if (!response.ok) {
+        throw new Error(data.error ?? "Upload failed.");
+      }
+
+      return data.count;
+    },
+    [catalogId],
+  );
+
+  const uploadViaBlob = useCallback(
+    async (files: File[]) => {
+      let uploadedCount = 0;
+
+      for (let index = 0; index < files.length; index += 1) {
+        const file = files[index];
+        setProgress(
+          `Uploading ${index + 1} of ${files.length}: ${file.name}`,
+        );
+
+        const filename = `${crypto.randomUUID()}.${getPhotoExtension(file.name)}`;
+        const pathname = getBlobPhotoPathname(catalogId, filename);
+
+        const blob = await upload(pathname, file, {
+          access: "private",
+          handleUploadUrl: "/api/photos/upload",
+          clientPayload: JSON.stringify({
+            catalogId,
+            originalName: file.name,
+            filename,
+          }),
+        });
+
+        const dimensions = await readImageDimensions(file);
+
+        const response = await fetch("/api/photos/register", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            catalogId,
+            storageUrl: blob.url,
+            pathname: blob.pathname,
+            originalName: file.name,
+            sizeBytes: file.size,
+            width: dimensions.width,
+            height: dimensions.height,
+          }),
+        });
+
+        const data = (await response.json()) as { error?: string };
+        if (!response.ok) {
+          throw new Error(data.error ?? `Failed to register ${file.name}.`);
+        }
+
+        uploadedCount += 1;
+      }
+
+      return uploadedCount;
+    },
+    [catalogId],
+  );
 
   const uploadFiles = useCallback(
     async (files: FileList | File[]) => {
-      const fileArray = Array.from(files);
+      const fileArray = Array.from(files).filter((file) =>
+        isAllowedPhotoFile(file.name, file.type),
+      );
       if (fileArray.length === 0) return;
+
+      if (directUpload === null) {
+        setProgress("Preparing upload…");
+        return;
+      }
 
       setUploading(true);
       setProgress(`Uploading ${fileArray.length} photo${fileArray.length > 1 ? "s" : ""}…`);
 
-      const formData = new FormData();
-      formData.append("catalogId", catalogId);
-      for (const file of fileArray) {
-        formData.append("files", file);
-      }
-
       try {
-        const response = await fetch("/api/photos", {
-          method: "POST",
-          body: formData,
-        });
-        const data = (await response.json()) as {
-          count: number;
-          uploaded: UploadedPhoto[];
-          error?: string;
-        };
+        const count = directUpload
+          ? await uploadViaBlob(fileArray)
+          : await uploadViaServer(fileArray);
 
-        if (!response.ok) {
-          setProgress(data.error ?? "Upload failed.");
-          return;
-        }
-
-        setProgress(`Uploaded ${data.count} photo${data.count === 1 ? "" : "s"}.`);
+        setProgress(`Uploaded ${count} photo${count === 1 ? "" : "s"}.`);
         onUploaded();
-      } catch {
-        setProgress("Upload failed.");
+      } catch (error) {
+        setProgress(
+          error instanceof Error ? error.message : "Upload failed.",
+        );
       } finally {
         setUploading(false);
-        setTimeout(() => setProgress(null), 3000);
+        setTimeout(() => setProgress(null), 4000);
       }
     },
-    [catalogId, onUploaded],
+    [directUpload, onUploaded, uploadViaBlob, uploadViaServer],
   );
 
   return (
@@ -89,14 +203,17 @@ export function PhotoUploader({
           accept="image/*"
           multiple
           className="hidden"
-          disabled={uploading}
+          disabled={uploading || directUpload === null}
           onChange={(e) => {
             if (e.target.files) void uploadFiles(e.target.files);
             e.target.value = "";
           }}
         />
         <p className="font-display text-2xl font-light">Drop photos here</p>
-        <p className="mt-2 text-sm text-muted">or click to browse · JPEG, PNG, WebP</p>
+        <p className="mt-2 text-sm text-muted">
+          or click to browse · JPEG, PNG, WebP
+          {directUpload ? " · large files supported" : null}
+        </p>
       </motion.label>
 
       {progress ? <p className="text-sm text-muted">{progress}</p> : null}
@@ -110,7 +227,7 @@ export function PhotoUploader({
           );
           input?.click();
         }}
-        disabled={uploading}
+        disabled={uploading || directUpload === null}
       >
         Select Files
       </MotionButton>
