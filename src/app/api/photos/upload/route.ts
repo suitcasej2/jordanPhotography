@@ -8,14 +8,14 @@ import { issueSignedToken } from "@vercel/blob";
 import { NextResponse } from "next/server";
 import {
   getBlobReadWriteToken,
+  isDirectBlobUploadEnabled,
   usesPresignedClientUpload,
 } from "@/lib/blob-config";
 import { validateUploadRequest } from "@/lib/photos/blob-upload-auth";
 import { hasAdminSession } from "@/lib/session";
-import { isDirectBlobUploadEnabled } from "@/lib/storage";
 
 export async function POST(request: Request) {
-  if (!isDirectBlobUploadEnabled()) {
+  if (!isDirectBlobUploadEnabled(request)) {
     return NextResponse.json(
       {
         error:
@@ -34,7 +34,7 @@ export async function POST(request: Request) {
     | HandleUploadPresignedBody;
 
   try {
-    if (usesPresignedClientUpload()) {
+    if (usesPresignedClientUpload(request)) {
       const jsonResponse = await handleUploadPresigned({
         body: body as HandleUploadPresignedBody,
         request,

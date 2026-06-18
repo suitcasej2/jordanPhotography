@@ -15,10 +15,15 @@ type StorageStatus = {
   directUpload?: boolean;
   blobConfigured?: boolean;
   storeConnected?: boolean;
+  hasStoreId?: boolean;
   hasReadWriteToken?: boolean;
   hasOidcAuth?: boolean;
+  hasOidcToken?: boolean;
   hasWebhookPublicKey?: boolean;
+  onVercel?: boolean;
+  missingEnv?: string[];
   uploadMode?: "presigned" | "legacy" | null;
+  setupHint?: string | null;
 };
 
 function getStorageWarning(status: StorageStatus | null) {
@@ -26,15 +31,7 @@ function getStorageWarning(status: StorageStatus | null) {
     return null;
   }
 
-  if (!status.storeConnected) {
-    return "Connect jordan-photography-blob to this project: Vercel project → Settings → Storage → Connect Store. Then redeploy.";
-  }
-
-  if (status.hasOidcAuth && !status.hasWebhookPublicKey) {
-    return "Blob is partially connected. Redeploy after linking the store so BLOB_WEBHOOK_PUBLIC_KEY is available.";
-  }
-
-  return "Blob storage is not ready for uploads yet. Redeploy after connecting the store.";
+  return status.setupHint ?? "Blob storage is not ready for uploads yet.";
 }
 
 type UploadedPhoto = {
@@ -253,7 +250,25 @@ export function PhotoUploader({
   return (
     <div className="space-y-4">
       {storageWarning ? (
-        <p className="text-sm text-amber-400/90">{storageWarning}</p>
+        <div className="space-y-2 rounded-sm border border-amber-400/30 bg-amber-400/5 px-4 py-3 text-sm text-amber-100/90">
+          <p>{storageWarning}</p>
+          {storageStatus ? (
+            <ul className="space-y-1 text-xs text-amber-200/70">
+              <li>Store ID: {storageStatus.hasStoreId ? "detected" : "missing"}</li>
+              <li>
+                Webhook key (presigned uploads):{" "}
+                {storageStatus.hasWebhookPublicKey ? "detected" : "missing"}
+              </li>
+              <li>
+                Read-write token (legacy uploads):{" "}
+                {storageStatus.hasReadWriteToken ? "detected" : "missing"}
+              </li>
+              {storageStatus.missingEnv?.length ? (
+                <li>Missing on this deployment: {storageStatus.missingEnv.join(", ")}</li>
+              ) : null}
+            </ul>
+          ) : null}
+        </div>
       ) : null}
 
       <motion.label

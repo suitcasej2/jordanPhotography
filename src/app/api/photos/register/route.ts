@@ -6,10 +6,10 @@ import {
   isAllowedPhotoFile,
 } from "@/lib/photos/upload";
 import { hasAdminSession } from "@/lib/session";
-import { isDirectBlobUploadEnabled } from "@/lib/storage";
+import { isDirectBlobUploadEnabled } from "@/lib/blob-config";
 
 export async function POST(request: Request) {
-  if (!isDirectBlobUploadEnabled()) {
+  if (!isDirectBlobUploadEnabled(request)) {
     return NextResponse.json(
       {
         error:
