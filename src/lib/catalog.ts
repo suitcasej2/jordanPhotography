@@ -27,6 +27,19 @@ export async function getCatalogBySlug(slug: string) {
   });
 }
 
+export function getGalleryShareDescription(
+  catalog: NonNullable<Awaited<ReturnType<typeof getCatalogBySlug>>>,
+) {
+  const photoLabel =
+    catalog.photos.length === 1 ? "1 photo" : `${catalog.photos.length} photos`;
+  const clientLabel = catalog.clientName ? `For ${catalog.clientName}` : null;
+  const daysRemaining = getDaysRemaining(catalog.expiresAt);
+  const expiryLabel =
+    daysRemaining === 1 ? "Available for 1 more day" : `Available for ${daysRemaining} days`;
+
+  return [clientLabel, photoLabel, expiryLabel].filter(Boolean).join(" · ");
+}
+
 export function toPublicCatalog(
   catalog: NonNullable<Awaited<ReturnType<typeof getCatalogBySlug>>>,
 ) {

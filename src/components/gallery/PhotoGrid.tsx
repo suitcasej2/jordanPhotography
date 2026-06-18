@@ -10,6 +10,7 @@ export type GalleryPhoto = {
   originalName: string;
   width?: number | null;
   height?: number | null;
+  sizeBytes?: number | null;
   url: string;
   downloadUrl: string;
 };

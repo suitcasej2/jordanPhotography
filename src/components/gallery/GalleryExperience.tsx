@@ -110,7 +110,10 @@ function GalleryContent({ slug }: { slug: string }) {
         animate={{ opacity: 1 }}
         transition={{ duration: 0.4 }}
       >
-        <GalleryControls slug={slug} photoCount={catalog.photoCount} />
+        <GalleryControls
+          title={catalog.title}
+          photos={catalog.photos ?? []}
+        />
 
         <div className="mx-auto max-w-7xl px-6 py-10">
           <FadeIn>
