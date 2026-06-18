@@ -40,7 +40,7 @@ export async function GET() {
   } catch (error) {
     console.error("Failed to load catalogs:", error);
     return NextResponse.json(
-      { error: "Database unavailable. Check DB_POSTGRES_URL and DB_PRISMA_DATABASE_URL." },
+      { error: "Database unavailable. Check DATABASE_URL or DB_DATABASE_URL." },
       { status: 503 },
     );
   }

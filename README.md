@@ -26,8 +26,8 @@ cp .env.example .env
 
 | Variable | Purpose |
 |----------|---------|
-| `DB_POSTGRES_URL` | Direct Postgres URL (auto-set by Vercel) |
-| `DB_PRISMA_DATABASE_URL` | Pooled URL for the app (auto-set by Vercel) |
+| `DATABASE_URL` or `DB_DATABASE_URL` | Pooled Postgres URL for the app (auto-set by Vercel Prisma Postgres) |
+| `DIRECT_URL` or `DB_POSTGRES_URL` | Direct Postgres URL for migrations (auto-set by Vercel) |
 | `ADMIN_PASSWORD` | Studio login at `/admin` |
 | `SESSION_SECRET` | Signed session cookies |
 | `BLOB_READ_WRITE_TOKEN` | Optional locally — without it, photos save to `uploads/` |
@@ -53,12 +53,12 @@ Open [http://localhost:3000](http://localhost:3000)
 
 Connect the repo in the [Vercel Dashboard](https://vercel.com/new).
 
-### 2. Add PostgreSQL
+### 2. Add Prisma Postgres
 
 In your Vercel project:
 
-- **Storage → Create Database → Postgres** (or connect [Neon](https://neon.tech))
-- Vercel auto-adds `DB_POSTGRES_URL` and `DB_PRISMA_DATABASE_URL` — no manual copy needed
+- **Storage → Connect Database → Prisma Postgres** (Vercel Marketplace)
+- Vercel auto-adds `DB_DATABASE_URL`, `DB_POSTGRES_URL`, and related vars — no manual copy needed
 
 ### 3. Set app env vars
 
@@ -75,7 +75,7 @@ CONTACT_PHONE=(555) 123-4567
 - **Storage → Create Store → Blob**
 - Vercel auto-adds `BLOB_READ_WRITE_TOKEN`
 
-**Delete** any old `DATABASE_URL` with placeholder values — the app no longer uses it.
+**Delete** any old `DATABASE_URL` placeholder you added manually — use the values Vercel sets from Prisma Postgres.
 
 ### 6. Deploy
 
