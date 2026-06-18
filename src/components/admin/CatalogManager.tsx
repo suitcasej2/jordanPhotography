@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { GalleryPasswordSettings } from "@/components/admin/GalleryPasswordSettings";
 import { PhotoUploader } from "@/components/admin/PhotoUploader";
 import { SortablePhotoGrid } from "@/components/admin/SortablePhotoGrid";
 import { FadeIn } from "@/components/motion/FadeIn";
@@ -107,6 +108,10 @@ export function CatalogManager({ catalogId }: { catalogId: string }) {
           {catalog.slug}
         </p>
       </FadeIn>
+
+      <div className="mt-10">
+        <GalleryPasswordSettings catalogId={catalogId} />
+      </div>
 
       <div className="mt-10">
         <PhotoUploader catalogId={catalogId} onUploaded={loadCatalog} />
