@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { upload } from "@vercel/blob/client";
 import { MotionButton } from "@/components/motion/FadeIn";
+import { readJsonResponse } from "@/lib/fetch-json";
 import {
   getBlobPhotoPathname,
   getPhotoExtension,
@@ -15,6 +16,8 @@ type UploadedPhoto = {
   originalName: string;
   url: string;
 };
+
+const SERVER_UPLOAD_LIMIT_BYTES = 4 * 1024 * 1024;
 
 async function readImageDimensions(file: File) {
   if (!file.type.startsWith("image/")) {
@@ -31,6 +34,16 @@ async function readImageDimensions(file: File) {
   }
 }
 
+function formatUploadError(error: unknown) {
+  if (error instanceof Error) {
+    if (/failed to retrieve the client token/i.test(error.message)) {
+      return "Upload authorization failed. Sign in again, then retry.";
+    }
+    return error.message;
+  }
+  return "Upload failed.";
+}
+
 export function PhotoUploader({
   catalogId,
   onUploaded,
@@ -42,6 +55,7 @@ export function PhotoUploader({
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState<string | null>(null);
   const [directUpload, setDirectUpload] = useState<boolean | null>(null);
+  const [blobConfigured, setBlobConfigured] = useState<boolean | null>(null);
 
   useEffect(() => {
     void (async () => {
@@ -51,19 +65,33 @@ export function PhotoUploader({
         });
         if (!response.ok) {
           setDirectUpload(false);
+          setBlobConfigured(false);
           return;
         }
 
-        const data = (await response.json()) as { directUpload?: boolean };
+        const data = await readJsonResponse<{
+          directUpload?: boolean;
+          blobConfigured?: boolean;
+        }>(response);
         setDirectUpload(Boolean(data.directUpload));
+        setBlobConfigured(Boolean(data.blobConfigured));
       } catch {
         setDirectUpload(false);
+        setBlobConfigured(false);
       }
     })();
   }, []);
 
   const uploadViaServer = useCallback(
     async (files: File[]) => {
+      for (const file of files) {
+        if (file.size > SERVER_UPLOAD_LIMIT_BYTES) {
+          throw new Error(
+            "Photo is too large for local/server upload. Connect Vercel Blob in production for large files.",
+          );
+        }
+      }
+
       const formData = new FormData();
       formData.append("catalogId", catalogId);
       for (const file of files) {
@@ -75,11 +103,11 @@ export function PhotoUploader({
         credentials: "include",
         body: formData,
       });
-      const data = (await response.json()) as {
+      const data = await readJsonResponse<{
         count: number;
         uploaded: UploadedPhoto[];
         error?: string;
-      };
+      }>(response);
 
       if (!response.ok) {
         throw new Error(data.error ?? "Upload failed.");
@@ -106,6 +134,7 @@ export function PhotoUploader({
         const blob = await upload(pathname, file, {
           access: "private",
           handleUploadUrl: "/api/photos/upload",
+          multipart: file.size > 8 * 1024 * 1024,
           clientPayload: JSON.stringify({
             catalogId,
             originalName: file.name,
@@ -130,7 +159,7 @@ export function PhotoUploader({
           }),
         });
 
-        const data = (await response.json()) as { error?: string };
+        const data = await readJsonResponse<{ error?: string }>(response);
         if (!response.ok) {
           throw new Error(data.error ?? `Failed to register ${file.name}.`);
         }
@@ -155,6 +184,16 @@ export function PhotoUploader({
         return;
       }
 
+      if (!directUpload && blobConfigured === false) {
+        const tooLarge = fileArray.some((file) => file.size > SERVER_UPLOAD_LIMIT_BYTES);
+        if (tooLarge) {
+          setProgress(
+            "Vercel Blob is not configured. Add Blob storage in Vercel and set BLOB_READ_WRITE_TOKEN to upload large photos.",
+          );
+          return;
+        }
+      }
+
       setUploading(true);
       setProgress(`Uploading ${fileArray.length} photo${fileArray.length > 1 ? "s" : ""}…`);
 
@@ -166,19 +205,24 @@ export function PhotoUploader({
         setProgress(`Uploaded ${count} photo${count === 1 ? "" : "s"}.`);
         onUploaded();
       } catch (error) {
-        setProgress(
-          error instanceof Error ? error.message : "Upload failed.",
-        );
+        setProgress(formatUploadError(error));
       } finally {
         setUploading(false);
-        setTimeout(() => setProgress(null), 4000);
+        setTimeout(() => setProgress(null), 6000);
       }
     },
-    [directUpload, onUploaded, uploadViaBlob, uploadViaServer],
+    [blobConfigured, directUpload, onUploaded, uploadViaBlob, uploadViaServer],
   );
 
   return (
     <div className="space-y-4">
+      {blobConfigured === false ? (
+        <p className="text-sm text-amber-400/90">
+          Blob storage is not configured. Large uploads will fail until{" "}
+          <code className="text-xs">BLOB_READ_WRITE_TOKEN</code> is set in Vercel.
+        </p>
+      ) : null}
+
       <motion.label
         className={`flex min-h-48 cursor-pointer flex-col items-center justify-center rounded-sm border border-dashed px-6 py-10 text-center transition ${
           dragging

@@ -1,6 +1,4 @@
 import { NextResponse } from "next/server";
-import imageSize from "image-size";
-import { prisma } from "@/lib/db";
 import { hasAdminSession } from "@/lib/session";
 import { isBlobStorageEnabled } from "@/lib/storage";
 
@@ -9,5 +7,10 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }
 
-  return NextResponse.json({ directUpload: isBlobStorageEnabled() });
+  const blobConfigured = isBlobStorageEnabled();
+
+  return NextResponse.json({
+    directUpload: blobConfigured,
+    blobConfigured,
+  });
 }

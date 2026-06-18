@@ -87,6 +87,10 @@ export async function POST(request: Request) {
       },
     });
 
+    if (jsonResponse.type === "blob.generate-client-token") {
+      return NextResponse.json({ clientToken: jsonResponse.clientToken });
+    }
+
     return NextResponse.json(jsonResponse);
   } catch (error) {
     return NextResponse.json(

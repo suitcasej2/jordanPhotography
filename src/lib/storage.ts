@@ -4,8 +4,12 @@ import path from "path";
 import type { PhotoStorageRecord } from "@/lib/photos";
 import { UPLOAD_DIR } from "@/lib/constants";
 
+function getBlobToken() {
+  return process.env.BLOB_READ_WRITE_TOKEN?.trim();
+}
+
 function useBlobStorage() {
-  return Boolean(process.env.BLOB_READ_WRITE_TOKEN);
+  return Boolean(getBlobToken());
 }
 
 function getUploadRoot() {
@@ -33,7 +37,7 @@ export async function savePhotoFile(
     const blob = await put(getBlobPathname(catalogId, filename), buffer, {
       access: "private",
       addRandomSuffix: false,
-      token: process.env.BLOB_READ_WRITE_TOKEN,
+      token: getBlobToken(),
     });
     return { storageUrl: blob.url };
   }
@@ -47,7 +51,7 @@ export async function readPhotoFile(photo: PhotoStorageRecord): Promise<Buffer> 
   if (photo.storageUrl) {
     const result = await get(photo.storageUrl, {
       access: "private",
-      token: process.env.BLOB_READ_WRITE_TOKEN,
+      token: getBlobToken(),
     });
 
     if (!result?.stream) {
@@ -62,7 +66,7 @@ export async function readPhotoFile(photo: PhotoStorageRecord): Promise<Buffer> 
 
 export async function deletePhotoFile(photo: PhotoStorageRecord) {
   if (photo.storageUrl) {
-    await del(photo.storageUrl, { token: process.env.BLOB_READ_WRITE_TOKEN });
+    await del(photo.storageUrl, { token: getBlobToken() });
     return;
   }
 
