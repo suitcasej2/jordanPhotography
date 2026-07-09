@@ -57,7 +57,7 @@ export function CreateCatalogForm({ onCreated }: { onCreated: () => void }) {
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             className="w-full border-b border-border bg-transparent py-2 outline-none focus:border-accent"
-            placeholder="Sarah & James — Wedding"
+            placeholder="Indigo Workshop"
             required
           />
         </label>

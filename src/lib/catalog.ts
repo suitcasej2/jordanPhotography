@@ -27,6 +27,17 @@ export async function getCatalogBySlug(slug: string) {
   });
 }
 
+export function getPreviewPhoto(
+  catalog: NonNullable<Awaited<ReturnType<typeof getCatalogBySlug>>>,
+) {
+  if (catalog.coverPhotoId) {
+    const cover = catalog.photos.find((photo) => photo.id === catalog.coverPhotoId);
+    if (cover) return cover;
+  }
+
+  return catalog.photos[0] ?? null;
+}
+
 export function getGalleryShareDescription(
   catalog: NonNullable<Awaited<ReturnType<typeof getCatalogBySlug>>>,
 ) {

@@ -17,15 +17,17 @@ model Catalog {
   clientName   String?
   passwordHash String
   expiresAt    DateTime
+  coverPhotoId String?  @unique
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
-  photos       Photo[]
+  coverPhoto   Photo?   @relation("CatalogCoverPhoto", fields: [coverPhotoId], references: [id], onDelete: SetNull)
+  photos       Photo[]  @relation("CatalogPhotos")
 }
 
 model Photo {
   id           String   @id @default(cuid())
   catalogId    String
-  catalog      Catalog  @relation(fields: [catalogId], references: [id], onDelete: Cascade)
+  catalog      Catalog  @relation("CatalogPhotos", fields: [catalogId], references: [id], onDelete: Cascade)
   filename     String
   originalName String
   width        Int?
@@ -34,6 +36,7 @@ model Photo {
   sortOrder    Int      @default(0)
   storageUrl   String?
   createdAt    DateTime @default(now())
+  coverFor     Catalog? @relation("CatalogCoverPhoto")
 
   @@index([catalogId])
 }

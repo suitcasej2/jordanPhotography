@@ -3,6 +3,7 @@ import { GalleryExperience } from "@/components/gallery/GalleryExperience";
 import {
   getCatalogBySlug,
   getGalleryShareDescription,
+  getPreviewPhoto,
   isCatalogExpired,
 } from "@/lib/catalog";
 import { getSiteUrl } from "@/lib/site-url";
@@ -25,8 +26,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   }
 
   const description = getGalleryShareDescription(catalog);
-  const firstPhoto = catalog.photos[0];
-  const previewUrl = firstPhoto
+  const previewPhoto = getPreviewPhoto(catalog);
+  const previewUrl = previewPhoto
     ? `${siteUrl}/api/catalogs/${slug}/preview`
     : undefined;
 
@@ -43,8 +44,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
         ? [
             {
               url: previewUrl,
-              width: firstPhoto.width ?? undefined,
-              height: firstPhoto.height ?? undefined,
+              width: previewPhoto.width ?? undefined,
+              height: previewPhoto.height ?? undefined,
               alt: catalog.title,
             },
           ]

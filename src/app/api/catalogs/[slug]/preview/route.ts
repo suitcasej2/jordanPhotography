@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getCatalogBySlug, isCatalogExpired } from "@/lib/catalog";
+import { getCatalogBySlug, getPreviewPhoto, isCatalogExpired } from "@/lib/catalog";
 import { getContentType } from "@/lib/photos";
 import { readPhotoFile } from "@/lib/storage";
 
@@ -15,17 +15,17 @@ export async function GET(_request: Request, context: RouteContext) {
     return new NextResponse(null, { status: 404 });
   }
 
-  const firstPhoto = catalog.photos[0];
-  if (!firstPhoto) {
+  const previewPhoto = getPreviewPhoto(catalog);
+  if (!previewPhoto) {
     return new NextResponse(null, { status: 404 });
   }
 
   try {
-    const buffer = await readPhotoFile(firstPhoto);
+    const buffer = await readPhotoFile(previewPhoto);
 
     return new NextResponse(new Uint8Array(buffer), {
       headers: {
-        "Content-Type": getContentType(firstPhoto.filename),
+        "Content-Type": getContentType(previewPhoto.filename),
         "Cache-Control": "public, max-age=3600, s-maxage=86400",
       },
     });

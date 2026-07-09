@@ -70,9 +70,11 @@ function formatUploadError(error: unknown) {
 export function PhotoUploader({
   catalogId,
   onUploaded,
+  onUploadingChange,
 }: {
   catalogId: string;
   onUploaded: () => void;
+  onUploadingChange?: (uploading: boolean) => void;
 }) {
   const [dragging, setDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -228,6 +230,7 @@ export function PhotoUploader({
       }
 
       setUploading(true);
+      onUploadingChange?.(true);
       setProgress(`Uploading ${fileArray.length} photo${fileArray.length > 1 ? "s" : ""}…`);
 
       try {
@@ -241,10 +244,18 @@ export function PhotoUploader({
         setProgress(formatUploadError(error));
       } finally {
         setUploading(false);
+        onUploadingChange?.(false);
         setTimeout(() => setProgress(null), 6000);
       }
     },
-    [directUpload, onUploaded, storageWarning, uploadViaBlob, uploadViaServer],
+    [
+      directUpload,
+      onUploaded,
+      onUploadingChange,
+      storageWarning,
+      uploadViaBlob,
+      uploadViaServer,
+    ],
   );
 
   return (

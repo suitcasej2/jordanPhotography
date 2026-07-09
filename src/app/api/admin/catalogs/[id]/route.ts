@@ -30,6 +30,7 @@ export async function GET(_request: Request, context: RouteContext) {
     title: catalog.title,
     clientName: catalog.clientName,
     expiresAt: catalog.expiresAt.toISOString(),
+    coverPhotoId: catalog.coverPhotoId,
     photos: catalog.photos.map((photo) => ({
       id: photo.id,
       originalName: photo.originalName,
@@ -44,11 +45,16 @@ export async function PATCH(request: Request, context: RouteContext) {
   }
 
   const { id } = await context.params;
-  const body = (await request.json()) as { password?: string };
-  const password = body.password?.trim();
+  const body = (await request.json()) as {
+    password?: string;
+    coverPhotoId?: string | null;
+  };
 
-  if (!password) {
-    return NextResponse.json({ error: "Password is required." }, { status: 400 });
+  const hasPasswordUpdate = body.password !== undefined;
+  const hasCoverPhotoUpdate = body.coverPhotoId !== undefined;
+
+  if (!hasPasswordUpdate && !hasCoverPhotoUpdate) {
+    return NextResponse.json({ error: "No updates provided." }, { status: 400 });
   }
 
   const existing = await prisma.catalog.findUnique({ where: { id } });
@@ -56,12 +62,37 @@ export async function PATCH(request: Request, context: RouteContext) {
     return NextResponse.json({ error: "Catalog not found." }, { status: 404 });
   }
 
-  const passwordHash = await bcrypt.hash(password, 12);
+  const data: { passwordHash?: string; coverPhotoId?: string | null } = {};
 
-  await prisma.catalog.update({
+  if (hasPasswordUpdate) {
+    const password = body.password?.trim();
+    if (!password) {
+      return NextResponse.json({ error: "Password is required." }, { status: 400 });
+    }
+    data.passwordHash = await bcrypt.hash(password, 12);
+  }
+
+  if (hasCoverPhotoUpdate) {
+    if (body.coverPhotoId === null) {
+      data.coverPhotoId = null;
+    } else if (body.coverPhotoId) {
+      const photo = await prisma.photo.findFirst({
+        where: { id: body.coverPhotoId, catalogId: id },
+      });
+      if (!photo) {
+        return NextResponse.json({ error: "Photo not found in this gallery." }, { status: 400 });
+      }
+      data.coverPhotoId = photo.id;
+    } else {
+      return NextResponse.json({ error: "Invalid cover photo." }, { status: 400 });
+    }
+  }
+
+  const updated = await prisma.catalog.update({
     where: { id },
-    data: { passwordHash },
+    data,
+    select: { coverPhotoId: true },
   });
 
-  return NextResponse.json({ success: true });
+  return NextResponse.json({ success: true, coverPhotoId: updated.coverPhotoId });
 }

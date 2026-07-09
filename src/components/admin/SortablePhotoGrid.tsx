@@ -32,6 +32,9 @@ export type ManagePhoto = {
 function SortablePhotoTile({
   photo,
   index,
+  isCoverPhoto,
+  onSetCoverPhoto,
+  settingCoverPhoto,
   onRemove,
   removing,
   confirmId,
@@ -41,6 +44,9 @@ function SortablePhotoTile({
 }: {
   photo: ManagePhoto;
   index: number;
+  isCoverPhoto: boolean;
+  onSetCoverPhoto: (id: string) => void;
+  settingCoverPhoto: string | null;
   onRemove: (id: string) => void;
   removing: string | null;
   confirmId: string | null;
@@ -60,6 +66,7 @@ function SortablePhotoTile({
 
   const isConfirming = confirmId === photo.id;
   const isRemoving = removing === photo.id;
+  const isSettingCover = settingCoverPhoto === photo.id;
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -72,7 +79,9 @@ function SortablePhotoTile({
       style={isOverlay ? undefined : style}
       className={`group relative aspect-square overflow-hidden rounded-sm bg-surface ${
         isDragging && !isOverlay ? "z-10 opacity-40" : ""
-      } ${isOverlay ? "scale-[1.03] shadow-2xl ring-1 ring-accent/40" : ""}`}
+      } ${isOverlay ? "scale-[1.03] shadow-2xl ring-1 ring-accent/40" : ""} ${
+        isCoverPhoto ? "ring-2 ring-accent/70" : ""
+      }`}
     >
       <ProtectedImage
         src={photo.url}
@@ -84,13 +93,20 @@ function SortablePhotoTile({
 
       {!isConfirming && !isOverlay ? (
         <>
-          <div className="absolute top-2 left-2 flex items-center gap-1 opacity-0 transition group-hover:opacity-100">
+          <div className="absolute top-2 left-2 flex items-center gap-1">
+            {isCoverPhoto ? (
+              <span className="bg-accent px-2 py-1 text-[10px] tracking-[0.1em] uppercase text-background">
+                Share preview
+              </span>
+            ) : null}
             <button
               type="button"
               ref={setActivatorNodeRef}
               {...attributes}
               {...listeners}
-              className="cursor-grab bg-black/60 px-2 py-1 text-xs tracking-[0.1em] uppercase text-white/80 active:cursor-grabbing hover:bg-black/80 hover:text-white"
+              className={`cursor-grab bg-black/60 px-2 py-1 text-xs tracking-[0.1em] uppercase text-white/80 active:cursor-grabbing hover:bg-black/80 hover:text-white ${
+                isCoverPhoto ? "" : "opacity-0 transition group-hover:opacity-100"
+              }`}
               aria-label={`Drag to reorder ${photo.originalName}`}
             >
               Drag
@@ -131,13 +147,25 @@ function SortablePhotoTile({
           </div>
         </motion.div>
       ) : !isOverlay ? (
-        <button
-          type="button"
-          onClick={() => onRemove(photo.id)}
-          className="absolute top-2 right-2 bg-black/60 px-2.5 py-1 text-xs tracking-[0.1em] uppercase text-white/80 opacity-0 transition hover:bg-black/80 hover:text-white group-hover:opacity-100"
-        >
-          Remove
-        </button>
+        <div className="absolute top-2 right-2 flex flex-col gap-1 opacity-0 transition group-hover:opacity-100">
+          {!isCoverPhoto ? (
+            <button
+              type="button"
+              onClick={() => onSetCoverPhoto(photo.id)}
+              disabled={isSettingCover}
+              className="bg-black/60 px-2.5 py-1 text-xs tracking-[0.1em] uppercase text-white/80 transition hover:bg-black/80 hover:text-white disabled:opacity-50"
+            >
+              {isSettingCover ? "Setting…" : "Set preview"}
+            </button>
+          ) : null}
+          <button
+            type="button"
+            onClick={() => onRemove(photo.id)}
+            className="bg-black/60 px-2.5 py-1 text-xs tracking-[0.1em] uppercase text-white/80 transition hover:bg-black/80 hover:text-white"
+          >
+            Remove
+          </button>
+        </div>
       ) : null}
     </div>
   );
@@ -146,6 +174,8 @@ function SortablePhotoTile({
 export function SortablePhotoGrid({
   catalogId,
   photos,
+  coverPhotoId,
+  onCoverPhotoChange,
   onPhotosChange,
   onRemove,
   removing,
@@ -155,6 +185,8 @@ export function SortablePhotoGrid({
 }: {
   catalogId: string;
   photos: ManagePhoto[];
+  coverPhotoId: string | null;
+  onCoverPhotoChange: (coverPhotoId: string | null) => void;
   onPhotosChange: (photos: ManagePhoto[]) => void;
   onRemove: (id: string) => void;
   removing: string | null;
@@ -164,6 +196,12 @@ export function SortablePhotoGrid({
 }) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [settingCoverPhoto, setSettingCoverPhoto] = useState<string | null>(null);
+
+  const effectiveCoverPhotoId =
+    coverPhotoId && photos.some((photo) => photo.id === coverPhotoId)
+      ? coverPhotoId
+      : photos[0]?.id ?? null;
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -172,6 +210,31 @@ export function SortablePhotoGrid({
 
   const activePhoto = activeId ? photos.find((photo) => photo.id === activeId) : null;
   const activeIndex = activePhoto ? photos.indexOf(activePhoto) : -1;
+
+  async function persistCoverPhoto(photoId: string) {
+    setSettingCoverPhoto(photoId);
+    const previousCoverPhotoId = coverPhotoId;
+    onCoverPhotoChange(photoId);
+
+    try {
+      const response = await fetch(`/api/admin/catalogs/${catalogId}`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ coverPhotoId: photoId }),
+      });
+      if (!response.ok) {
+        throw new Error("Failed to set preview photo");
+      }
+
+      const data = (await response.json()) as { coverPhotoId?: string | null };
+      onCoverPhotoChange(data.coverPhotoId ?? photoId);
+    } catch {
+      onCoverPhotoChange(previousCoverPhotoId);
+    } finally {
+      setSettingCoverPhoto(null);
+    }
+  }
 
   async function persistOrder(previousPhotos: ManagePhoto[], nextPhotos: ManagePhoto[]) {
     setSaving(true);
@@ -214,7 +277,7 @@ export function SortablePhotoGrid({
     <div>
       <div className="mb-4 flex items-center justify-between gap-4">
         <p className="text-xs tracking-[0.15em] uppercase text-muted">
-          Drag photos to set gallery order
+          Drag photos to set gallery order · Set preview for link shares
         </p>
         {saving ? (
           <p className="text-xs tracking-[0.15em] uppercase text-accent">Saving order…</p>
@@ -234,6 +297,9 @@ export function SortablePhotoGrid({
                 key={photo.id}
                 photo={photo}
                 index={index}
+                isCoverPhoto={photo.id === effectiveCoverPhotoId}
+                onSetCoverPhoto={(photoId) => void persistCoverPhoto(photoId)}
+                settingCoverPhoto={settingCoverPhoto}
                 onRemove={onRemove}
                 removing={removing}
                 confirmId={confirmId}
@@ -249,6 +315,9 @@ export function SortablePhotoGrid({
             <SortablePhotoTile
               photo={activePhoto}
               index={activeIndex}
+              isCoverPhoto={activePhoto.id === effectiveCoverPhotoId}
+              onSetCoverPhoto={(photoId) => void persistCoverPhoto(photoId)}
+              settingCoverPhoto={settingCoverPhoto}
               onRemove={onRemove}
               removing={removing}
               confirmId={confirmId}
