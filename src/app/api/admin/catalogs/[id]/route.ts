@@ -1,6 +1,7 @@
 import bcrypt from "bcryptjs";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { slugify } from "@/lib/catalog";
 import { hasAdminSession } from "@/lib/session";
 
 type RouteContext = {
@@ -46,14 +47,26 @@ export async function PATCH(request: Request, context: RouteContext) {
 
   const { id } = await context.params;
   const body = (await request.json()) as {
+    title?: string;
+    clientName?: string;
+    slug?: string;
     password?: string;
     coverPhotoId?: string | null;
   };
 
+  const hasTitleUpdate = body.title !== undefined;
+  const hasClientNameUpdate = body.clientName !== undefined;
+  const hasSlugUpdate = body.slug !== undefined;
   const hasPasswordUpdate = body.password !== undefined;
   const hasCoverPhotoUpdate = body.coverPhotoId !== undefined;
 
-  if (!hasPasswordUpdate && !hasCoverPhotoUpdate) {
+  if (
+    !hasTitleUpdate &&
+    !hasClientNameUpdate &&
+    !hasSlugUpdate &&
+    !hasPasswordUpdate &&
+    !hasCoverPhotoUpdate
+  ) {
     return NextResponse.json({ error: "No updates provided." }, { status: 400 });
   }
 
@@ -62,7 +75,39 @@ export async function PATCH(request: Request, context: RouteContext) {
     return NextResponse.json({ error: "Catalog not found." }, { status: 404 });
   }
 
-  const data: { passwordHash?: string; coverPhotoId?: string | null } = {};
+  const data: {
+    title?: string;
+    clientName?: string | null;
+    slug?: string;
+    passwordHash?: string;
+    coverPhotoId?: string | null;
+  } = {};
+
+  if (hasTitleUpdate) {
+    const title = body.title?.trim();
+    if (!title) {
+      return NextResponse.json({ error: "Title is required." }, { status: 400 });
+    }
+    data.title = title;
+  }
+
+  if (hasClientNameUpdate) {
+    data.clientName = body.clientName?.trim() || null;
+  }
+
+  if (hasSlugUpdate) {
+    const slug = slugify(body.slug?.trim() || "");
+    if (!slug) {
+      return NextResponse.json({ error: "URL slug is required." }, { status: 400 });
+    }
+
+    const conflict = await prisma.catalog.findUnique({ where: { slug } });
+    if (conflict && conflict.id !== id) {
+      return NextResponse.json({ error: "That URL slug is already in use." }, { status: 400 });
+    }
+
+    data.slug = slug;
+  }
 
   if (hasPasswordUpdate) {
     const password = body.password?.trim();
@@ -91,8 +136,13 @@ export async function PATCH(request: Request, context: RouteContext) {
   const updated = await prisma.catalog.update({
     where: { id },
     data,
-    select: { coverPhotoId: true },
+    select: {
+      title: true,
+      clientName: true,
+      slug: true,
+      coverPhotoId: true,
+    },
   });
 
-  return NextResponse.json({ success: true, coverPhotoId: updated.coverPhotoId });
+  return NextResponse.json({ success: true, ...updated });
 }

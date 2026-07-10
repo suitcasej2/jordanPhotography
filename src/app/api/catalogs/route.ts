@@ -1,16 +1,8 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/db";
-import { getCatalogExpiryDate } from "@/lib/catalog";
+import { getCatalogExpiryDate, slugify } from "@/lib/catalog";
 import { hasAdminSession } from "@/lib/session";
-
-function slugify(value: string) {
-  return value
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-}
 
 export async function GET() {
   if (!(await hasAdminSession())) {

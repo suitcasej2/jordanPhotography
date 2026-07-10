@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { EditCatalogForm } from "@/components/admin/EditCatalogForm";
 import { GalleryPasswordSettings } from "@/components/admin/GalleryPasswordSettings";
 import { PhotoUploader } from "@/components/admin/PhotoUploader";
 import { SortablePhotoGrid } from "@/components/admin/SortablePhotoGrid";
@@ -173,6 +174,18 @@ export function CatalogManager({ catalogId }: { catalogId: string }) {
           </div>
         </div>
       </FadeIn>
+
+      <div className="mt-10">
+        <EditCatalogForm
+          catalogId={catalogId}
+          initialTitle={catalog.title}
+          initialClientName={catalog.clientName}
+          initialSlug={catalog.slug}
+          onUpdated={(updates) =>
+            setCatalog((current) => (current ? { ...current, ...updates } : current))
+          }
+        />
+      </div>
 
       <div className="mt-10">
         <GalleryPasswordSettings catalogId={catalogId} />

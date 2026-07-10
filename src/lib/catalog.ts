@@ -1,6 +1,14 @@
 import { prisma } from "@/lib/db";
 import { CATALOG_DURATION_DAYS } from "@/lib/constants";
 
+export function slugify(value: string) {
+  return value
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
 export function isCatalogExpired(expiresAt: Date) {
   return expiresAt.getTime() <= Date.now();
 }
