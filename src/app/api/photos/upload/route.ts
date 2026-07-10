@@ -59,6 +59,7 @@ export async function POST(request: Request) {
               maximumSizeInBytes: upload.maximumSizeInBytes,
               validUntil: upload.validUntil,
               addRandomSuffix: false,
+              cacheControlMaxAge: 30 * 24 * 60 * 60,
               tokenPayload: JSON.stringify(upload.payload),
             },
           };

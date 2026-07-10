@@ -20,6 +20,8 @@ function getBlobPathname(catalogId: string, filename: string) {
   return `catalogs/${catalogId}/${filename}`;
 }
 
+const BLOB_CACHE_MAX_AGE_SECONDS = 30 * 24 * 60 * 60;
+
 function getBlobAuthOptions() {
   const token = getBlobReadWriteToken();
   return token ? { token } : {};
@@ -38,6 +40,7 @@ export async function savePhotoFile(
     const blob = await put(getBlobPathname(catalogId, filename), buffer, {
       access: "private",
       addRandomSuffix: false,
+      cacheControlMaxAge: BLOB_CACHE_MAX_AGE_SECONDS,
       ...getBlobAuthOptions(),
     });
     return { storageUrl: blob.url };

@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCatalogBySlug, getPreviewPhoto, isCatalogExpired } from "@/lib/catalog";
-import { getContentType } from "@/lib/photos";
-import { readPhotoFile } from "@/lib/storage";
+import { serveAuthorizedPhoto } from "@/lib/photos/access";
 
 type RouteContext = {
   params: Promise<{ slug: string }>;
@@ -20,16 +19,11 @@ export async function GET(_request: Request, context: RouteContext) {
     return new NextResponse(null, { status: 404 });
   }
 
-  try {
-    const buffer = await readPhotoFile(previewPhoto);
-
-    return new NextResponse(new Uint8Array(buffer), {
-      headers: {
-        "Content-Type": getContentType(previewPhoto.filename),
-        "Cache-Control": "public, max-age=3600, s-maxage=86400",
-      },
-    });
-  } catch {
-    return new NextResponse(null, { status: 404 });
+  const response = await serveAuthorizedPhoto(previewPhoto);
+  if (response.status === 307) {
+    return response;
   }
+
+  response.headers.set("Cache-Control", "public, max-age=3600, s-maxage=86400");
+  return response;
 }

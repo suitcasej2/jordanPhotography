@@ -10,19 +10,6 @@ import { SortablePhotoGrid } from "@/components/admin/SortablePhotoGrid";
 import { FadeIn, MotionButton } from "@/components/motion/FadeIn";
 import { PageLoader } from "@/components/ui/Loader";
 
-function preloadImage(url: string) {
-  return new Promise<void>((resolve, reject) => {
-    const image = new Image();
-    image.onload = () => resolve();
-    image.onerror = () => reject(new Error(`Failed to load ${url}`));
-    image.src = url;
-  });
-}
-
-async function preloadPhotos(photos: Array<{ url: string }>) {
-  await Promise.all(photos.map((photo) => preloadImage(photo.url)));
-}
-
 type CatalogDetail = {
   id: string;
   slug: string;
@@ -45,7 +32,6 @@ export function CatalogManager({ catalogId }: { catalogId: string }) {
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [finishing, setFinishing] = useState(false);
-  const [finishError, setFinishError] = useState("");
 
   const loadCatalog = useCallback(async () => {
     setLoading(true);
@@ -72,30 +58,9 @@ export function CatalogManager({ catalogId }: { catalogId: string }) {
   }, [loadCatalog]);
 
   async function handleFinish() {
-    setFinishError("");
     setFinishing(true);
-
-    try {
-      const response = await fetch(`/api/admin/catalogs/${catalogId}`, {
-        credentials: "include",
-      });
-      if (!response.ok) {
-        throw new Error("Could not refresh gallery.");
-      }
-
-      const data = (await response.json()) as CatalogDetail;
-      setCatalog(data);
-
-      if (data.photos.length > 0) {
-        await preloadPhotos(data.photos);
-      }
-
-      router.push("/admin");
-    } catch {
-      setFinishError("Some photos are still loading. Try again in a moment.");
-    } finally {
-      setFinishing(false);
-    }
+    router.push("/admin");
+    setFinishing(false);
   }
 
   async function handleConfirmRemove(photoId: string) {
@@ -168,9 +133,6 @@ export function CatalogManager({ catalogId }: { catalogId: string }) {
             >
               {finishing ? "Finishing…" : "Finish"}
             </MotionButton>
-            {finishError ? (
-              <p className="max-w-48 text-right text-xs text-red-500">{finishError}</p>
-            ) : null}
           </div>
         </div>
       </FadeIn>
