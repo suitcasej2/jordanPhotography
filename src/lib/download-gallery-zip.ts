@@ -12,6 +12,8 @@ export type DownloadProgress = {
   message: string;
 };
 
+const DOWNLOAD_CONCURRENCY = 6;
+
 async function readResponseWithProgress(
   response: Response,
   onBytes: (loaded: number, total: number | null) => void,
@@ -60,6 +62,36 @@ function formatBytes(bytes: number) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+type PhotoDownloadState = {
+  loaded: number;
+  total: number | null;
+  done: boolean;
+};
+
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  concurrency: number,
+  fn: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let nextIndex = 0;
+
+  async function worker() {
+    while (nextIndex < items.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      results[index] = await fn(items[index], index);
+    }
+  }
+
+  const workers = Array.from(
+    { length: Math.min(concurrency, items.length) },
+    () => worker(),
+  );
+  await Promise.all(workers);
+  return results;
+}
+
 export async function downloadGalleryZip(options: {
   photos: GalleryDownloadPhoto[];
   signal?: AbortSignal;
@@ -68,50 +100,72 @@ export async function downloadGalleryZip(options: {
   const { photos, signal, onProgress } = options;
   const zip = new JSZip();
   const downloadWeight = 0.85;
+  const states: PhotoDownloadState[] = photos.map((photo) => ({
+    loaded: 0,
+    total: photo.sizeBytes ?? null,
+    done: false,
+  }));
 
-  for (let index = 0; index < photos.length; index += 1) {
-    const photo = photos[index];
-    const label = photo.originalName;
+  function reportProgress() {
+    const totalBytes = states.reduce((sum, state) => sum + (state.total ?? 0), 0);
+    const loadedBytes = states.reduce((sum, state) => sum + state.loaded, 0);
+    const completed = states.filter((state) => state.done).length;
+
+    let percent: number;
+    if (totalBytes > 0) {
+      percent = Math.round((loadedBytes / totalBytes) * downloadWeight * 100);
+    } else {
+      percent = Math.round((completed / photos.length) * downloadWeight * 100);
+    }
+
+    const active = states.findIndex((state) => !state.done);
+    const activePhoto = active >= 0 ? photos[active] : photos[photos.length - 1];
+    const activeState = active >= 0 ? states[active] : states[states.length - 1];
+    const sizeHint =
+      activeState.total && activeState.loaded > 0
+        ? ` · ${formatBytes(activeState.loaded)} / ${formatBytes(activeState.total)}`
+        : "";
 
     onProgress({
       phase: "downloading",
-      percent: Math.round((index / photos.length) * downloadWeight * 100),
-      message: `Downloading ${index + 1} of ${photos.length}: ${label}`,
+      percent,
+      message:
+        completed === photos.length
+          ? `Downloaded ${photos.length} photos`
+          : `Downloading ${completed + 1} of ${photos.length}: ${activePhoto.originalName}${sizeHint}`,
     });
+  }
 
-    const response = await fetch(photo.downloadUrl, {
-      credentials: "include",
-      signal,
-    });
+  const buffers = await mapWithConcurrency(
+    photos,
+    DOWNLOAD_CONCURRENCY,
+    async (photo, index) => {
+      const response = await fetch(photo.downloadUrl, { signal });
 
-    if (!response.ok) {
-      throw new Error(`Could not download ${label}.`);
-    }
+      if (!response.ok) {
+        throw new Error(`Could not download ${photo.originalName}.`);
+      }
 
-    const buffer = await readResponseWithProgress(
-      response,
-      (loaded, total) => {
-        const fileProgress =
-          total && total > 0 ? loaded / total : photo.sizeBytes ? loaded / photo.sizeBytes : 0;
-        const overall =
-          ((index + Math.min(fileProgress, 1)) / photos.length) * downloadWeight * 100;
-        const totalBytes = total ?? photo.sizeBytes ?? null;
-        const sizeHint = totalBytes
-          ? ` · ${formatBytes(loaded)} / ${formatBytes(totalBytes)}`
-          : loaded > 0
-            ? ` · ${formatBytes(loaded)}`
-            : "";
+      const buffer = await readResponseWithProgress(
+        response,
+        (loaded, total) => {
+          states[index].loaded = loaded;
+          if (total) states[index].total = total;
+          reportProgress();
+        },
+        signal,
+      );
 
-        onProgress({
-          phase: "downloading",
-          percent: Math.round(overall),
-          message: `Downloading ${index + 1} of ${photos.length}: ${label}${sizeHint}`,
-        });
-      },
-      signal,
-    );
+      states[index].done = true;
+      states[index].loaded = buffer.byteLength;
+      reportProgress();
 
-    zip.file(photo.originalName, buffer);
+      return { originalName: photo.originalName, buffer };
+    },
+  );
+
+  for (const { originalName, buffer } of buffers) {
+    zip.file(originalName, buffer);
   }
 
   onProgress({
@@ -147,4 +201,10 @@ export function saveBlobAsFile(blob: Blob, filename: string) {
   anchor.download = filename;
   anchor.click();
   URL.revokeObjectURL(url);
+}
+
+export function prefetchImage(url: string) {
+  if (!url || url.startsWith("/api/")) return;
+  const image = new Image();
+  image.src = url;
 }

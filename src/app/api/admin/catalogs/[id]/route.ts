@@ -2,6 +2,7 @@ import bcrypt from "bcryptjs";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { slugify } from "@/lib/catalog";
+import { withPresignedPhotoUrls } from "@/lib/photos/urls";
 import { hasAdminSession } from "@/lib/session";
 
 type RouteContext = {
@@ -25,6 +26,8 @@ export async function GET(_request: Request, context: RouteContext) {
     return NextResponse.json({ error: "Catalog not found." }, { status: 404 });
   }
 
+  const photos = await withPresignedPhotoUrls(catalog.photos);
+
   return NextResponse.json({
     id: catalog.id,
     slug: catalog.slug,
@@ -32,10 +35,10 @@ export async function GET(_request: Request, context: RouteContext) {
     clientName: catalog.clientName,
     expiresAt: catalog.expiresAt.toISOString(),
     coverPhotoId: catalog.coverPhotoId,
-    photos: catalog.photos.map((photo) => ({
+    photos: photos.map((photo) => ({
       id: photo.id,
       originalName: photo.originalName,
-      url: `/api/photos/${photo.id}`,
+      url: photo.url,
     })),
   });
 }

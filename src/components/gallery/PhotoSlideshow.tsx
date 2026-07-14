@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { ProtectedImage } from "@/components/ui/ProtectedImage";
 import type { GalleryPhoto } from "@/components/gallery/PhotoGrid";
+import { prefetchImage } from "@/lib/download-gallery-zip";
 
 export function PhotoSlideshow({ photos }: { photos: GalleryPhoto[] }) {
   const [index, setIndex] = useState(0);
@@ -28,8 +29,10 @@ export function PhotoSlideshow({ photos }: { photos: GalleryPhoto[] }) {
 
   useEffect(() => {
     window.addEventListener("keydown", handleKey);
+    if (index > 0) prefetchImage(photos[index - 1].url);
+    if (index < photos.length - 1) prefetchImage(photos[index + 1].url);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [handleKey]);
+  }, [handleKey, index, photos]);
 
   if (!photo) return null;
 
@@ -56,6 +59,7 @@ export function PhotoSlideshow({ photos }: { photos: GalleryPhoto[] }) {
               }`}
               sizes="100vw"
               priority
+              fullResolution
               onLoad={() => setLoaded(true)}
             />
           </motion.div>

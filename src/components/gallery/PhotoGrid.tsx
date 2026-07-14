@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { FadeInItem, FadeInStagger } from "@/components/motion/FadeIn";
 import { ProtectedImage } from "@/components/ui/ProtectedImage";
+import { prefetchImage } from "@/lib/download-gallery-zip";
 
 export type GalleryPhoto = {
   id: string;
@@ -89,11 +90,13 @@ function Lightbox({
   useEffect(() => {
     document.body.style.overflow = "hidden";
     window.addEventListener("keydown", handleKey);
+    if (index > 0) prefetchImage(photos[index - 1].url);
+    if (index < photos.length - 1) prefetchImage(photos[index + 1].url);
     return () => {
       document.body.style.overflow = "";
       window.removeEventListener("keydown", handleKey);
     };
-  }, [handleKey]);
+  }, [handleKey, index, photos]);
 
   return (
     <motion.div
@@ -141,6 +144,7 @@ function Lightbox({
           className="object-contain"
           sizes="100vw"
           priority
+          fullResolution
         />
       </motion.div>
 
