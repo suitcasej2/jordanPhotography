@@ -3,14 +3,14 @@
 import Image, { type ImageProps } from "next/image";
 
 type ProtectedImageProps = ImageProps & {
-  /** Load the original file without Next.js resizing (lightbox / full view). */
+  /** Load the original file without resizing (lightbox / full view). */
   fullResolution?: boolean;
 };
 
 /**
- * Gallery images use presigned Blob URLs from the catalog API. Grid tiles are
- * resized via Next.js image optimization; lightbox uses full resolution.
+ * Grid tiles use pre-generated WebP previews (~1400px). Lightbox uses full-res
+ * originals. Both load directly from Blob — no server proxy or optimizer hop.
  */
 export function ProtectedImage({ fullResolution = false, ...props }: ProtectedImageProps) {
-  return <Image {...props} unoptimized={fullResolution} />;
+  return <Image {...props} unoptimized />;
 }

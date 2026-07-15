@@ -19,7 +19,7 @@ const nextConfig: NextConfig = {
   experimental: {
     optimizePackageImports: ["framer-motion"],
   },
-  serverExternalPackages: ["@prisma/client", "pg"],
+  serverExternalPackages: ["@prisma/client", "pg", "sharp"],
   outputFileTracingIncludes: {
     "/api/**/*": ["./src/generated/prisma/**/*"],
     "/*": ["./src/generated/prisma/**/*"],

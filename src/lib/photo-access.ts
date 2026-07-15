@@ -1,6 +1,7 @@
 import { getDownloadUrl, issueSignedToken, presignUrl, type IssuedSignedToken } from "@vercel/blob";
 import { isBlobStorageEnabled } from "@/lib/blob-config";
 import type { PhotoStorageRecord } from "@/lib/photos";
+import { getBlobPreviewPathname } from "@/lib/photos/upload";
 
 const DELEGATION_TTL_MS = 60 * 60 * 1000;
 const READ_URL_TTL_MS = 2 * 60 * 60 * 1000;
@@ -14,6 +15,14 @@ export function getPhotoBlobPathname(catalogId: string, filename: string) {
 
 export function canServePhotoFromBlob(photo: PhotoStorageRecord) {
   return isBlobStorageEnabled() && Boolean(photo.storageUrl);
+}
+
+function getReadPathname(photo: PhotoStorageRecord, variant: "preview" | "full") {
+  if (variant === "preview" && photo.previewFilename) {
+    return getBlobPreviewPathname(photo.catalogId, photo.previewFilename);
+  }
+
+  return getPhotoBlobPathname(photo.catalogId, photo.filename);
 }
 
 async function getReadDelegationToken() {
@@ -36,9 +45,9 @@ async function getReadDelegationToken() {
 
 export async function createPresignedPhotoReadUrl(
   photo: PhotoStorageRecord,
-  options?: { download?: boolean },
+  options?: { download?: boolean; variant?: "preview" | "full" },
 ) {
-  const pathname = getPhotoBlobPathname(photo.catalogId, photo.filename);
+  const pathname = getReadPathname(photo, options?.variant ?? "full");
   const token = await getReadDelegationToken();
   const validUntil = Date.now() + READ_URL_TTL_MS;
 
@@ -54,16 +63,17 @@ export async function createPresignedPhotoReadUrl(
 
 export async function createPresignedPhotoReadUrls(
   photos: PhotoStorageRecord[],
-  options?: { download?: boolean },
+  options?: { download?: boolean; variant?: "preview" | "full" },
 ) {
   if (photos.length === 0) return [];
 
   const token = await getReadDelegationToken();
   const validUntil = Date.now() + READ_URL_TTL_MS;
+  const variant = options?.variant ?? "full";
 
   return Promise.all(
     photos.map(async (photo) => {
-      const pathname = getPhotoBlobPathname(photo.catalogId, photo.filename);
+      const pathname = getReadPathname(photo, variant);
       const { presignedUrl } = await presignUrl(token, {
         operation: "get",
         pathname,
@@ -75,4 +85,3 @@ export async function createPresignedPhotoReadUrls(
     }),
   );
 }
-

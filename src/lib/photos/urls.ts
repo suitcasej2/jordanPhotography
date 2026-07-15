@@ -20,22 +20,32 @@ export async function withPresignedPhotoUrls<T extends PhotoWithUrls>(photos: T[
     return photos.map((photo) => ({
       ...photo,
       url: `/api/photos/${photo.id}`,
+      fullUrl: `/api/photos/${photo.id}`,
       downloadUrl: `/api/photos/${photo.id}/download`,
     }));
   }
 
-  const viewUrls = await createPresignedPhotoReadUrls(blobPhotos);
+  const [previewUrls, fullUrls] = await Promise.all([
+    createPresignedPhotoReadUrls(blobPhotos, { variant: "preview" }),
+    createPresignedPhotoReadUrls(blobPhotos, { variant: "full" }),
+  ]);
 
-  const viewById = new Map(
-    blobPhotos.map((photo, index) => [photo.id, viewUrls[index]] as const),
+  const previewById = new Map(
+    blobPhotos.map((photo, index) => [photo.id, previewUrls[index]] as const),
+  );
+  const fullById = new Map(
+    blobPhotos.map((photo, index) => [photo.id, fullUrls[index]] as const),
   );
 
   return photos.map((photo) => {
-    const viewUrl = viewById.get(photo.id);
+    const fullUrl = fullById.get(photo.id);
     return {
       ...photo,
-      url: viewUrl ?? `/api/photos/${photo.id}`,
-      downloadUrl: viewUrl ? getDownloadUrl(viewUrl) : `/api/photos/${photo.id}/download`,
+      url: previewById.get(photo.id) ?? `/api/photos/${photo.id}`,
+      fullUrl: fullUrl ?? `/api/photos/${photo.id}`,
+      downloadUrl: fullUrl
+        ? getDownloadUrl(fullUrl)
+        : `/api/photos/${photo.id}/download`,
     };
   });
 }

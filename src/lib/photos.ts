@@ -18,5 +18,6 @@ export function getContentType(filename: string) {
 export type PhotoStorageRecord = {
   catalogId: string;
   filename: string;
+  previewFilename?: string | null;
   storageUrl: string | null;
 };

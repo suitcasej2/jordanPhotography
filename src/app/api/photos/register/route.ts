@@ -28,6 +28,7 @@ export async function POST(request: Request) {
     storageUrl?: string;
     pathname?: string;
     originalName?: string;
+    previewFilename?: string;
     sizeBytes?: number;
     width?: number;
     height?: number;
@@ -37,6 +38,7 @@ export async function POST(request: Request) {
   const storageUrl = body.storageUrl?.trim();
   const pathname = body.pathname?.trim();
   const originalName = body.originalName?.trim();
+  const previewFilename = body.previewFilename?.trim() || null;
 
   if (!catalogId || !storageUrl || !pathname || !originalName) {
     return NextResponse.json(
@@ -70,6 +72,7 @@ export async function POST(request: Request) {
     data: {
       catalogId,
       filename,
+      previewFilename,
       originalName,
       width: body.width,
       height: body.height,

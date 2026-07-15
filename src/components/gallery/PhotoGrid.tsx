@@ -13,6 +13,7 @@ export type GalleryPhoto = {
   height?: number | null;
   sizeBytes?: number | null;
   url: string;
+  fullUrl: string;
   downloadUrl: string;
 };
 
@@ -90,8 +91,8 @@ function Lightbox({
   useEffect(() => {
     document.body.style.overflow = "hidden";
     window.addEventListener("keydown", handleKey);
-    if (index > 0) prefetchImage(photos[index - 1].url);
-    if (index < photos.length - 1) prefetchImage(photos[index + 1].url);
+    if (index > 0) prefetchImage(photos[index - 1].fullUrl);
+    if (index < photos.length - 1) prefetchImage(photos[index + 1].fullUrl);
     return () => {
       document.body.style.overflow = "";
       window.removeEventListener("keydown", handleKey);
@@ -138,7 +139,7 @@ function Lightbox({
         onClick={(e) => e.stopPropagation()}
       >
         <ProtectedImage
-          src={photo.url}
+          src={photo.fullUrl}
           alt={photo.originalName}
           fill
           className="object-contain"

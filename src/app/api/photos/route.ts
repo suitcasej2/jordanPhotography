@@ -3,8 +3,9 @@ import { v4 as uuidv4 } from "uuid";
 import imageSize from "image-size";
 import { prisma } from "@/lib/db";
 import { hasAdminSession } from "@/lib/session";
-import { savePhotoFile } from "@/lib/storage";
+import { generatePreviewBuffer, getPreviewFilenameForPhoto } from "@/lib/photos/preview";
 import { getPhotoExtension, isAllowedPhotoFile } from "@/lib/photos/upload";
+import { savePhotoFile, savePreviewFile } from "@/lib/storage";
 
 export async function POST(request: Request) {
   if (!(await hasAdminSession())) {
@@ -44,8 +45,17 @@ export async function POST(request: Request) {
     const buffer = Buffer.from(await entry.arrayBuffer());
     const ext = getPhotoExtension(entry.name);
     const filename = `${uuidv4()}.${ext}`;
+    let previewFilename: string | null = null;
 
     const { storageUrl } = await savePhotoFile(catalogId, filename, buffer);
+
+    try {
+      const previewBuffer = await generatePreviewBuffer(buffer);
+      previewFilename = getPreviewFilenameForPhoto(filename);
+      await savePreviewFile(catalogId, previewFilename, previewBuffer);
+    } catch {
+      previewFilename = null;
+    }
 
     let width: number | undefined;
     let height: number | undefined;
@@ -61,6 +71,7 @@ export async function POST(request: Request) {
       data: {
         catalogId,
         filename,
+        previewFilename,
         originalName: entry.name,
         width,
         height,

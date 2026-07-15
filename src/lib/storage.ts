@@ -6,6 +6,7 @@ import {
   isBlobStorageEnabled,
 } from "@/lib/blob-config";
 import type { PhotoStorageRecord } from "@/lib/photos";
+import { getBlobPreviewPathname } from "@/lib/photos/upload";
 import { UPLOAD_DIR } from "@/lib/constants";
 
 function getUploadRoot() {
@@ -14,6 +15,10 @@ function getUploadRoot() {
 
 function getLocalPhotoPath(catalogId: string, filename: string) {
   return path.join(getUploadRoot(), catalogId, filename);
+}
+
+function getLocalPreviewPath(catalogId: string, previewFilename: string) {
+  return path.join(getUploadRoot(), catalogId, "previews", previewFilename);
 }
 
 function getBlobPathname(catalogId: string, filename: string) {
@@ -29,6 +34,10 @@ function getBlobAuthOptions() {
 
 async function ensureLocalCatalogDir(catalogId: string) {
   await mkdir(path.join(getUploadRoot(), catalogId), { recursive: true });
+}
+
+async function ensureLocalPreviewDir(catalogId: string) {
+  await mkdir(path.join(getUploadRoot(), catalogId, "previews"), { recursive: true });
 }
 
 export async function savePhotoFile(
@@ -51,6 +60,26 @@ export async function savePhotoFile(
   return { storageUrl: null };
 }
 
+export async function savePreviewFile(
+  catalogId: string,
+  previewFilename: string,
+  buffer: Buffer,
+) {
+  if (isBlobStorageEnabled()) {
+    await put(getBlobPreviewPathname(catalogId, previewFilename), buffer, {
+      access: "private",
+      addRandomSuffix: false,
+      contentType: "image/webp",
+      cacheControlMaxAge: BLOB_CACHE_MAX_AGE_SECONDS,
+      ...getBlobAuthOptions(),
+    });
+    return;
+  }
+
+  await ensureLocalPreviewDir(catalogId);
+  await writeFile(getLocalPreviewPath(catalogId, previewFilename), buffer);
+}
+
 export async function readPhotoFile(photo: PhotoStorageRecord): Promise<Buffer> {
   if (photo.storageUrl) {
     const result = await get(photo.storageUrl, {
@@ -71,6 +100,13 @@ export async function readPhotoFile(photo: PhotoStorageRecord): Promise<Buffer> 
 export async function deletePhotoFile(photo: PhotoStorageRecord) {
   if (photo.storageUrl) {
     await del(photo.storageUrl, getBlobAuthOptions());
+
+    if (photo.previewFilename) {
+      await del(
+        getBlobPreviewPathname(photo.catalogId, photo.previewFilename),
+        getBlobAuthOptions(),
+      );
+    }
     return;
   }
 
@@ -78,6 +114,14 @@ export async function deletePhotoFile(photo: PhotoStorageRecord) {
     await unlink(getLocalPhotoPath(photo.catalogId, photo.filename));
   } catch {
     // File may already be missing
+  }
+
+  if (photo.previewFilename) {
+    try {
+      await unlink(getLocalPreviewPath(photo.catalogId, photo.previewFilename));
+    } catch {
+      // Preview may already be missing
+    }
   }
 }
 

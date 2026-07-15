@@ -7,9 +7,11 @@ import { MotionButton } from "@/components/motion/FadeIn";
 import { readJsonResponse } from "@/lib/fetch-json";
 import {
   getBlobPhotoPathname,
+  getBlobPreviewPathname,
   getPhotoExtension,
   isAllowedPhotoFile,
 } from "@/lib/photos/upload";
+import { generatePreviewBlob } from "@/lib/photos/preview-client";
 
 type StorageStatus = {
   directUpload?: boolean;
@@ -158,6 +160,8 @@ export function PhotoUploader({
 
         const filename = `${crypto.randomUUID()}.${getPhotoExtension(file.name)}`;
         const pathname = getBlobPhotoPathname(catalogId, filename);
+        const previewFilename = `${crypto.randomUUID()}.webp`;
+        const previewPathname = getBlobPreviewPathname(catalogId, previewFilename);
         const uploadOptions = {
           access: "private" as const,
           handleUploadUrl: "/api/photos/upload",
@@ -169,10 +173,36 @@ export function PhotoUploader({
           }),
         };
 
-        const blob =
+        const previewBlob = await generatePreviewBlob(file);
+
+        const originalUpload =
           uploadMode === "presigned"
-            ? await uploadPresigned(pathname, file, uploadOptions)
-            : await upload(pathname, file, uploadOptions);
+            ? uploadPresigned(pathname, file, uploadOptions)
+            : upload(pathname, file, uploadOptions);
+
+        const previewUpload = previewBlob
+          ? uploadMode === "presigned"
+            ? uploadPresigned(previewPathname, previewBlob, {
+                access: "private",
+                handleUploadUrl: "/api/photos/upload",
+                clientPayload: JSON.stringify({
+                  kind: "preview",
+                  catalogId,
+                  previewFilename,
+                }),
+              })
+            : upload(previewPathname, previewBlob, {
+                access: "private",
+                handleUploadUrl: "/api/photos/upload",
+                clientPayload: JSON.stringify({
+                  kind: "preview",
+                  catalogId,
+                  previewFilename,
+                }),
+              })
+          : Promise.resolve(null);
+
+        const [blob] = await Promise.all([originalUpload, previewUpload]);
 
         const dimensions = await readImageDimensions(file);
 
@@ -185,6 +215,7 @@ export function PhotoUploader({
             storageUrl: blob.url,
             pathname: blob.pathname,
             originalName: file.name,
+            previewFilename: previewBlob ? previewFilename : undefined,
             sizeBytes: file.size,
             width: dimensions.width,
             height: dimensions.height,

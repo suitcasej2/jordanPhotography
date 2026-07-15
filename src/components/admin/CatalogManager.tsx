@@ -32,6 +32,7 @@ export function CatalogManager({ catalogId }: { catalogId: string }) {
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [finishing, setFinishing] = useState(false);
+  const [optimizing, setOptimizing] = useState(false);
 
   const loadCatalog = useCallback(async () => {
     setLoading(true);
@@ -56,6 +57,42 @@ export function CatalogManager({ catalogId }: { catalogId: string }) {
   useEffect(() => {
     void loadCatalog();
   }, [loadCatalog]);
+
+  useEffect(() => {
+    if (!catalog?.photos.length) return;
+
+    let cancelled = false;
+
+    async function backfillPreviews() {
+      setOptimizing(true);
+      try {
+        while (!cancelled) {
+          const response = await fetch(`/api/admin/catalogs/${catalogId}/previews`, {
+            method: "POST",
+            credentials: "include",
+          });
+          const data = (await response.json()) as {
+            done?: boolean;
+            processed?: number;
+          };
+
+          if (!response.ok || data.done || !data.processed) {
+            break;
+          }
+        }
+      } finally {
+        if (!cancelled) {
+          setOptimizing(false);
+        }
+      }
+    }
+
+    void backfillPreviews();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [catalog?.photos.length, catalogId]);
 
   async function handleFinish() {
     setFinishing(true);
@@ -122,6 +159,7 @@ export function CatalogManager({ catalogId }: { catalogId: string }) {
             <p className="mt-2 text-sm text-muted">
               {catalog.photos.length} photos · {daysLeft} days remaining · /gallery/
               {catalog.slug}
+              {optimizing ? " · Optimizing photos for faster loading…" : null}
             </p>
           </div>
           <div className="flex shrink-0 flex-col items-end gap-2">

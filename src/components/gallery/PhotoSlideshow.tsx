@@ -29,8 +29,8 @@ export function PhotoSlideshow({ photos }: { photos: GalleryPhoto[] }) {
 
   useEffect(() => {
     window.addEventListener("keydown", handleKey);
-    if (index > 0) prefetchImage(photos[index - 1].url);
-    if (index < photos.length - 1) prefetchImage(photos[index + 1].url);
+    if (index > 0) prefetchImage(photos[index - 1].fullUrl);
+    if (index < photos.length - 1) prefetchImage(photos[index + 1].fullUrl);
     return () => window.removeEventListener("keydown", handleKey);
   }, [handleKey, index, photos]);
 
@@ -51,7 +51,7 @@ export function PhotoSlideshow({ photos }: { photos: GalleryPhoto[] }) {
             transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
           >
             <ProtectedImage
-              src={photo.url}
+              src={photo.fullUrl}
               alt={photo.originalName}
               fill
               className={`object-contain transition-opacity duration-300 ${

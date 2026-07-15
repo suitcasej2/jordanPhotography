@@ -32,10 +32,11 @@ model Photo {
   originalName String
   width        Int?
   height       Int?
-  sizeBytes    Int
-  sortOrder    Int      @default(0)
-  storageUrl   String?
-  createdAt    DateTime @default(now())
+  sizeBytes        Int
+  sortOrder        Int      @default(0)
+  storageUrl       String?
+  previewFilename  String?
+  createdAt        DateTime @default(now())
   coverFor     Catalog? @relation("CatalogCoverPhoto")
 
   @@index([catalogId])

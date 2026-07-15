@@ -22,6 +22,10 @@ export function getBlobPhotoPathname(catalogId: string, filename: string) {
   return `catalogs/${catalogId}/${filename}`;
 }
 
+export function getBlobPreviewPathname(catalogId: string, previewFilename: string) {
+  return `catalogs/${catalogId}/previews/${previewFilename}`;
+}
+
 export function filenameFromBlobPathname(pathname: string) {
   return pathname.split("/").pop() ?? pathname;
 }

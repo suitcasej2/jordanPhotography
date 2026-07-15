@@ -77,6 +77,7 @@ export function toPublicCatalog(
       height: photo.height,
       sizeBytes: photo.sizeBytes,
       url: `/api/photos/${photo.id}`,
+      fullUrl: `/api/photos/${photo.id}`,
       downloadUrl: `/api/photos/${photo.id}/download`,
     })),
   };
