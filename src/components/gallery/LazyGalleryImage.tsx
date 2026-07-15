@@ -1,6 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import {
+  acquireImageLoadSlot,
+  releaseImageLoadSlot,
+} from "@/lib/image-load-queue";
 
 type LazyGalleryImageProps = {
   src: string;
@@ -10,6 +14,10 @@ type LazyGalleryImageProps = {
   onLoad?: () => void;
   onError?: () => void;
 };
+
+function isReadyImageUrl(url: string) {
+  return url.startsWith("http");
+}
 
 export function LazyGalleryImage({
   src,
@@ -21,9 +29,14 @@ export function LazyGalleryImage({
 }: LazyGalleryImageProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [shouldLoad, setShouldLoad] = useState(priority);
+  const [canRequest, setCanRequest] = useState(false);
+  const readySrc = isReadyImageUrl(src);
 
   useEffect(() => {
-    if (priority || shouldLoad) return;
+    if (priority) {
+      setShouldLoad(true);
+      return;
+    }
 
     const element = containerRef.current;
     if (!element) return;
@@ -35,25 +48,53 @@ export function LazyGalleryImage({
           observer.disconnect();
         }
       },
-      { rootMargin: "800px 0px" },
+      { rootMargin: "280px 0px" },
     );
 
     observer.observe(element);
     return () => observer.disconnect();
-  }, [priority, shouldLoad]);
+  }, [priority]);
+
+  useEffect(() => {
+    if (!shouldLoad || !readySrc) {
+      setCanRequest(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    void acquireImageLoadSlot().then(() => {
+      if (cancelled) {
+        releaseImageLoadSlot();
+        return;
+      }
+      setCanRequest(true);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [shouldLoad, readySrc, src]);
 
   return (
     <div ref={containerRef} className="absolute inset-0">
-      {shouldLoad ? (
+      {canRequest ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={src}
           alt={alt}
           loading={priority ? "eager" : "lazy"}
           decoding="async"
+          fetchPriority={priority ? "high" : "auto"}
           className={className}
-          onLoad={onLoad}
-          onError={onError}
+          onLoad={() => {
+            releaseImageLoadSlot();
+            onLoad?.();
+          }}
+          onError={() => {
+            releaseImageLoadSlot();
+            onError?.();
+          }}
         />
       ) : null}
     </div>

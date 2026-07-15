@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { getCatalogBySlug, isCatalogExpired, toPublicCatalog } from "@/lib/catalog";
-import { withPresignedPhotoUrls } from "@/lib/photos/urls";
 import { hasCatalogSession } from "@/lib/session";
 
 type RouteContext = {
@@ -41,12 +40,8 @@ export async function GET(_request: Request, context: RouteContext) {
     });
   }
 
-  const publicCatalog = toPublicCatalog(catalog);
-  const photos = await withPresignedPhotoUrls(catalog.photos, { previewsOnly: true });
-
   return NextResponse.json({
-    ...publicCatalog,
-    photos,
+    ...toPublicCatalog(catalog),
     authenticated: true,
   });
 }

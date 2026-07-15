@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { LazyGalleryImage, useBlobPreconnect } from "@/components/gallery/LazyGalleryImage";
 import { prefetchImage } from "@/lib/download-gallery-zip";
@@ -180,12 +180,38 @@ function Lightbox({
 
 export function PhotoGrid({ photos }: { photos: GalleryPhoto[] }) {
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
-  useBlobPreconnect(photos.map((photo) => photo.url));
+  const [visibleCount, setVisibleCount] = useState(21);
+  const loadMoreRef = useRef<HTMLDivElement>(null);
+  const visiblePhotos = photos.slice(0, visibleCount);
+  useBlobPreconnect(visiblePhotos.map((photo) => photo.url));
+
+  useEffect(() => {
+    setVisibleCount(21);
+  }, [photos]);
+
+  useEffect(() => {
+    if (visibleCount >= photos.length) return;
+
+    const sentinel = loadMoreRef.current;
+    if (!sentinel) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setVisibleCount((current) => Math.min(current + 18, photos.length));
+        }
+      },
+      { rootMargin: "500px 0px" },
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [photos.length, visibleCount]);
 
   return (
     <>
       <div className="columns-1 gap-4 sm:columns-2 lg:columns-3">
-        {photos.map((photo, index) => (
+        {visiblePhotos.map((photo, index) => (
           <PhotoTile
             key={photo.id}
             photo={photo}
@@ -194,6 +220,12 @@ export function PhotoGrid({ photos }: { photos: GalleryPhoto[] }) {
           />
         ))}
       </div>
+
+      {visibleCount < photos.length ? (
+        <div ref={loadMoreRef} className="py-10 text-center text-sm text-muted">
+          Loading more photos…
+        </div>
+      ) : null}
 
       <AnimatePresence>
         {lightboxIndex !== null ? (

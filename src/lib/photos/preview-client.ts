@@ -1,5 +1,5 @@
-const PREVIEW_MAX_EDGE = 960;
-const PREVIEW_WEBP_QUALITY = 0.75;
+const PREVIEW_MAX_EDGE = 640;
+const PREVIEW_WEBP_QUALITY = 0.72;
 
 export async function generatePreviewBlob(file: File): Promise<Blob | null> {
   if (!/\.(jpe?g|png|webp)$/i.test(file.name) && !/^image\/(jpeg|png|webp)$/i.test(file.type)) {

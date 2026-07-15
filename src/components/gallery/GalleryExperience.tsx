@@ -13,6 +13,7 @@ import { PhotoSlideshow } from "@/components/gallery/PhotoSlideshow";
 import { FadeIn } from "@/components/motion/FadeIn";
 import { BookingFooter } from "@/components/site/BookingFooter";
 import { PageLoader, SkeletonGrid } from "@/components/ui/Loader";
+import { hydrateGalleryPhotoUrls } from "@/lib/gallery-photo-urls";
 
 type CatalogResponse = {
   slug: string;
@@ -29,6 +30,7 @@ type CatalogResponse = {
 
 function GalleryContent({ slug }: { slug: string }) {
   const [catalog, setCatalog] = useState<CatalogResponse | null>(null);
+  const [photos, setPhotos] = useState<GalleryPhoto[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const { viewMode } = useGalleryPreferences();
@@ -47,16 +49,24 @@ function GalleryContent({ slug }: { slug: string }) {
       if (response.status === 410 || data.expired) {
         setError("This gallery has expired and is no longer available.");
         setCatalog(null);
+        setPhotos([]);
         return;
       }
 
       if (!response.ok) {
         setError(data.error ?? "Gallery not found.");
         setCatalog(null);
+        setPhotos([]);
         return;
       }
 
       setCatalog(data);
+      const initialPhotos = data.photos ?? [];
+      setPhotos(initialPhotos);
+
+      if (data.authenticated && initialPhotos.length > 0) {
+        void hydrateGalleryPhotoUrls(slug, initialPhotos, setPhotos);
+      }
     } catch {
       setError("Unable to load gallery.");
     } finally {
@@ -110,10 +120,7 @@ function GalleryContent({ slug }: { slug: string }) {
         animate={{ opacity: 1 }}
         transition={{ duration: 0.4 }}
       >
-        <GalleryControls
-          title={catalog.title}
-          photos={catalog.photos ?? []}
-        />
+        <GalleryControls title={catalog.title} photos={photos} />
 
         <div className="mx-auto max-w-7xl px-6 py-10">
           <FadeIn>
@@ -136,7 +143,7 @@ function GalleryContent({ slug }: { slug: string }) {
             </div>
           </FadeIn>
 
-          {catalog.photos && catalog.photos.length > 0 ? (
+          {photos.length > 0 ? (
             <AnimatePresence mode="wait">
               <motion.div
                 key={viewMode}
@@ -146,9 +153,9 @@ function GalleryContent({ slug }: { slug: string }) {
                 transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
               >
                 {viewMode === "grid" ? (
-                  <PhotoGrid photos={catalog.photos} />
+                  <PhotoGrid photos={photos} />
                 ) : (
-                  <PhotoSlideshow photos={catalog.photos} />
+                  <PhotoSlideshow photos={photos} />
                 )}
               </motion.div>
             </AnimatePresence>
