@@ -2,7 +2,7 @@ import bcrypt from "bcryptjs";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { slugify } from "@/lib/catalog";
-import { withPresignedPhotoUrls } from "@/lib/photos/urls";
+import { withGalleryPhotoUrls } from "@/lib/photos/urls";
 import { hasAdminSession } from "@/lib/session";
 
 type RouteContext = {
@@ -30,7 +30,7 @@ export async function GET(_request: Request, context: RouteContext) {
     where: { catalogId: id, previewFilename: null },
   });
 
-  const photos = await withPresignedPhotoUrls(catalog.photos, { previewsOnly: true });
+  const photos = await withGalleryPhotoUrls(catalog.photos);
 
   return NextResponse.json({
     id: catalog.id,

@@ -1,9 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { LazyGalleryImage, useBlobPreconnect } from "@/components/gallery/LazyGalleryImage";
-import { prefetchImage } from "@/lib/download-gallery-zip";
+import { GalleryImage } from "@/components/gallery/GalleryImage";
 
 export type GalleryPhoto = {
   id: string;
@@ -14,7 +13,6 @@ export type GalleryPhoto = {
   url: string;
   fullUrl: string;
   downloadUrl: string;
-  hasPreview?: boolean;
 };
 
 function PhotoTile({
@@ -26,38 +24,19 @@ function PhotoTile({
   index: number;
   onOpen: (index: number) => void;
 }) {
-  const [loaded, setLoaded] = useState(false);
-  const [failed, setFailed] = useState(false);
-  const aspect =
-    photo.width && photo.height ? photo.width / photo.height : 3 / 4;
-
   return (
     <button
       type="button"
       onClick={() => onOpen(index)}
-      className="group relative mb-4 w-full break-inside-avoid overflow-hidden rounded-sm bg-surface text-left"
-      style={{ aspectRatio: aspect }}
+      className="group relative aspect-[4/5] overflow-hidden bg-surface"
     >
-      {!loaded && !failed ? (
-        <div className="skeleton-shimmer absolute inset-0" />
-      ) : null}
-      {failed ? (
-        <div className="absolute inset-0 flex items-center justify-center text-xs text-muted">
-          Unable to load
-        </div>
-      ) : (
-        <LazyGalleryImage
-          src={photo.url}
-          alt={photo.originalName}
-          priority={index < 4}
-          className={`h-full w-full object-cover transition duration-500 ease-out group-hover:scale-[1.02] ${
-            loaded ? "opacity-100" : "opacity-0"
-          }`}
-          onLoad={() => setLoaded(true)}
-          onError={() => setFailed(true)}
-        />
-      )}
-      <div className="pointer-events-none absolute inset-0 bg-black/0 transition group-hover:bg-black/10" />
+      <GalleryImage
+        src={photo.url}
+        alt={photo.originalName}
+        priority={index < 8}
+        className="h-full w-full object-cover transition duration-700 ease-out group-hover:scale-[1.02]"
+      />
+      <div className="pointer-events-none absolute inset-0 bg-black/0 transition duration-300 group-hover:bg-black/10" />
     </button>
   );
 }
@@ -74,7 +53,6 @@ function Lightbox({
   onNavigate: (next: number) => void;
 }) {
   const photo = photos[index];
-  const [loaded, setLoaded] = useState(false);
 
   const handleKey = useCallback(
     (event: KeyboardEvent) => {
@@ -86,19 +64,13 @@ function Lightbox({
   );
 
   useEffect(() => {
-    setLoaded(false);
-  }, [photo.id]);
-
-  useEffect(() => {
     document.body.style.overflow = "hidden";
     window.addEventListener("keydown", handleKey);
-    if (index > 0) prefetchImage(photos[index - 1].fullUrl);
-    if (index < photos.length - 1) prefetchImage(photos[index + 1].fullUrl);
     return () => {
       document.body.style.overflow = "";
       window.removeEventListener("keydown", handleKey);
     };
-  }, [handleKey, index, photos]);
+  }, [handleKey]);
 
   return (
     <motion.div
@@ -106,7 +78,7 @@ function Lightbox({
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      transition={{ duration: 0.25 }}
+      transition={{ duration: 0.2 }}
       onClick={onClose}
     >
       <button
@@ -133,19 +105,17 @@ function Lightbox({
       <motion.div
         key={photo.id}
         className="relative h-full max-h-[85vh] w-full max-w-6xl"
-        initial={{ opacity: 0, scale: 0.98 }}
-        animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.98 }}
-        transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.2 }}
         onClick={(e) => e.stopPropagation()}
       >
-        {!loaded ? <div className="skeleton-shimmer absolute inset-0" /> : null}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
+        <GalleryImage
           src={photo.fullUrl}
           alt={photo.originalName}
-          className={`h-full w-full object-contain ${loaded ? "opacity-100" : "opacity-0"}`}
-          onLoad={() => setLoaded(true)}
+          priority
+          className="h-full w-full object-contain"
         />
       </motion.div>
 
@@ -180,38 +150,11 @@ function Lightbox({
 
 export function PhotoGrid({ photos }: { photos: GalleryPhoto[] }) {
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
-  const [visibleCount, setVisibleCount] = useState(21);
-  const loadMoreRef = useRef<HTMLDivElement>(null);
-  const visiblePhotos = photos.slice(0, visibleCount);
-  useBlobPreconnect(visiblePhotos.map((photo) => photo.url));
-
-  useEffect(() => {
-    setVisibleCount(21);
-  }, [photos]);
-
-  useEffect(() => {
-    if (visibleCount >= photos.length) return;
-
-    const sentinel = loadMoreRef.current;
-    if (!sentinel) return;
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setVisibleCount((current) => Math.min(current + 18, photos.length));
-        }
-      },
-      { rootMargin: "500px 0px" },
-    );
-
-    observer.observe(sentinel);
-    return () => observer.disconnect();
-  }, [photos.length, visibleCount]);
 
   return (
     <>
-      <div className="columns-1 gap-4 sm:columns-2 lg:columns-3">
-        {visiblePhotos.map((photo, index) => (
+      <div className="grid grid-cols-2 gap-1 md:grid-cols-3 md:gap-1.5 lg:grid-cols-4">
+        {photos.map((photo, index) => (
           <PhotoTile
             key={photo.id}
             photo={photo}
@@ -220,12 +163,6 @@ export function PhotoGrid({ photos }: { photos: GalleryPhoto[] }) {
           />
         ))}
       </div>
-
-      {visibleCount < photos.length ? (
-        <div ref={loadMoreRef} className="py-10 text-center text-sm text-muted">
-          Loading more photos…
-        </div>
-      ) : null}
 
       <AnimatePresence>
         {lightboxIndex !== null ? (

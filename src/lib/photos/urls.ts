@@ -1,4 +1,3 @@
-import { getDownloadUrl } from "@vercel/blob";
 import {
   canServePhotoFromBlob,
   createPresignedPhotoReadUrls,
@@ -13,58 +12,50 @@ type PhotoWithUrls = PhotoStorageRecord & {
   sizeBytes?: number | null;
 };
 
-type PresignOptions = {
-  /** Only sign grid preview URLs — full URLs load on demand via /api/photos/[id]. */
-  previewsOnly?: boolean;
+export type GalleryPhotoUrls = {
+  url: string;
+  fullUrl: string;
+  downloadUrl: string;
 };
 
-export async function withPresignedPhotoUrls<T extends PhotoWithUrls>(
+function apiPhotoUrls(photoId: string): GalleryPhotoUrls {
+  return {
+    url: `/api/photos/${photoId}`,
+    fullUrl: `/api/photos/${photoId}`,
+    downloadUrl: `/api/photos/${photoId}/download`,
+  };
+}
+
+/**
+ * Sign grid thumbnail URLs in one pass. Full-size and download URLs are served
+ * on demand through the photo API when a client opens or downloads an image.
+ */
+export async function withGalleryPhotoUrls<T extends PhotoWithUrls>(
   photos: T[],
-  options?: PresignOptions,
-) {
+): Promise<Array<T & GalleryPhotoUrls>> {
   const blobPhotos = photos.filter(canServePhotoFromBlob);
 
   if (blobPhotos.length === 0) {
-    return photos.map((photo) => ({
-      ...photo,
-      url: `/api/photos/${photo.id}`,
-      fullUrl: `/api/photos/${photo.id}`,
-      downloadUrl: `/api/photos/${photo.id}/download`,
-      hasPreview: false,
-    }));
+    return photos.map((photo) => ({ ...photo, ...apiPhotoUrls(photo.id) }));
   }
 
-  const previewUrls = await createPresignedPhotoReadUrls(blobPhotos, {
+  const thumbUrls = await createPresignedPhotoReadUrls(blobPhotos, {
     variant: "preview",
   });
 
-  const previewById = new Map(
-    blobPhotos.map((photo, index) => [photo.id, previewUrls[index]] as const),
+  const thumbById = new Map(
+    blobPhotos.map((photo, index) => [photo.id, thumbUrls[index]] as const),
   );
 
-  let fullById: Map<string, string> | null = null;
-  if (!options?.previewsOnly) {
-    const fullUrls = await createPresignedPhotoReadUrls(blobPhotos, {
-      variant: "full",
-    });
-    fullById = new Map(
-      blobPhotos.map((photo, index) => [photo.id, fullUrls[index]] as const),
-    );
-  }
-
   return photos.map((photo) => {
-    const previewUrl = previewById.get(photo.id);
-    const fullUrl = fullById?.get(photo.id) ?? `/api/photos/${photo.id}`;
-    const hasPreview = Boolean(photo.previewFilename);
+    const thumbUrl = thumbById.get(photo.id);
+    const apiUrls = apiPhotoUrls(photo.id);
 
     return {
       ...photo,
-      url: previewUrl ?? `/api/photos/${photo.id}`,
-      fullUrl,
-      downloadUrl: fullById?.get(photo.id)
-        ? getDownloadUrl(fullById.get(photo.id)!)
-        : `/api/photos/${photo.id}/download`,
-      hasPreview,
+      url: thumbUrl ?? apiUrls.url,
+      fullUrl: apiUrls.fullUrl,
+      downloadUrl: apiUrls.downloadUrl,
     };
   });
 }

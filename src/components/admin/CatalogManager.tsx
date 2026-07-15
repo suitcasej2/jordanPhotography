@@ -61,46 +61,35 @@ export function CatalogManager({ catalogId }: { catalogId: string }) {
     void loadCatalog();
   }, [loadCatalog]);
 
-  useEffect(() => {
-    if (!catalog?.photos.length) return;
+  async function handlePrepareGallery() {
+    setOptimizing(true);
+    try {
+      let remaining = previewsRemaining;
 
-    let cancelled = false;
+      while (remaining > 0) {
+        const response = await fetch(`/api/admin/catalogs/${catalogId}/previews`, {
+          method: "POST",
+          credentials: "include",
+        });
+        const data = (await response.json()) as {
+          done?: boolean;
+          processed?: number;
+          remaining?: number;
+        };
 
-    async function backfillPreviews() {
-      setOptimizing(true);
-      try {
-        while (!cancelled) {
-          const response = await fetch(`/api/admin/catalogs/${catalogId}/previews`, {
-            method: "POST",
-            credentials: "include",
-          });
-          const data = (await response.json()) as {
-            done?: boolean;
-            processed?: number;
-            remaining?: number;
-          };
+        if (!response.ok) break;
 
-          if (!response.ok) break;
-          if (typeof data.remaining === "number") {
-            setPreviewsRemaining(data.remaining);
-          }
-          if (data.done || !data.processed) {
-            break;
-          }
-        }
-      } finally {
-        if (!cancelled) {
-          setOptimizing(false);
-        }
+        remaining = data.remaining ?? 0;
+        setPreviewsRemaining(remaining);
+
+        if (data.done || !data.processed) break;
       }
+
+      await loadCatalog();
+    } finally {
+      setOptimizing(false);
     }
-
-    void backfillPreviews();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [catalog?.photos.length, catalogId]);
+  }
 
   async function handleFinish() {
     setFinishing(true);
@@ -167,9 +156,6 @@ export function CatalogManager({ catalogId }: { catalogId: string }) {
             <p className="mt-2 text-sm text-muted">
               {catalog.photos.length} photos · {daysLeft} days remaining · /gallery/
               {catalog.slug}
-              {optimizing && previewsRemaining > 0
-                ? ` · Optimizing ${previewsRemaining} photos for faster loading…`
-                : null}
             </p>
           </div>
           <div className="flex shrink-0 flex-col items-end gap-2">
@@ -184,6 +170,27 @@ export function CatalogManager({ catalogId }: { catalogId: string }) {
           </div>
         </div>
       </FadeIn>
+
+      {previewsRemaining > 0 ? (
+        <div className="mt-8 flex flex-col gap-4 rounded-sm border border-border/60 p-5 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm text-foreground">
+              {previewsRemaining} photos need web-sized copies for fast client viewing.
+            </p>
+            <p className="mt-1 text-xs text-muted">
+              Run this once before sharing the gallery link.
+            </p>
+          </div>
+          <MotionButton
+            type="button"
+            onClick={() => void handlePrepareGallery()}
+            disabled={optimizing || uploading}
+            className="border border-foreground/20 px-5 py-2.5 text-xs tracking-[0.15em] uppercase transition hover:border-accent hover:text-accent disabled:opacity-40"
+          >
+            {optimizing ? "Preparing…" : "Prepare gallery"}
+          </MotionButton>
+        </div>
+      ) : null}
 
       <div className="mt-10">
         <EditCatalogForm

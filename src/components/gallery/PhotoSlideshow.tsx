@@ -2,19 +2,15 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { LazyGalleryImage, useBlobPreconnect } from "@/components/gallery/LazyGalleryImage";
+import { GalleryImage } from "@/components/gallery/GalleryImage";
 import type { GalleryPhoto } from "@/components/gallery/PhotoGrid";
-import { prefetchImage } from "@/lib/download-gallery-zip";
 
 export function PhotoSlideshow({ photos }: { photos: GalleryPhoto[] }) {
   const [index, setIndex] = useState(0);
-  const [loaded, setLoaded] = useState(false);
   const photo = photos[index];
-  useBlobPreconnect(photos.map((item) => item.url));
 
   const goTo = useCallback(
     (next: number) => {
-      setLoaded(false);
       setIndex(Math.max(0, Math.min(next, photos.length - 1)));
     },
     [photos.length],
@@ -30,35 +26,28 @@ export function PhotoSlideshow({ photos }: { photos: GalleryPhoto[] }) {
 
   useEffect(() => {
     window.addEventListener("keydown", handleKey);
-    if (index > 0) prefetchImage(photos[index - 1].fullUrl);
-    if (index < photos.length - 1) prefetchImage(photos[index + 1].fullUrl);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [handleKey, index, photos]);
+  }, [handleKey]);
 
   if (!photo) return null;
 
   return (
     <div className="flex min-h-[calc(100vh-12rem)] flex-col">
       <div className="relative flex flex-1 items-center justify-center overflow-hidden rounded-sm bg-surface">
-        {!loaded ? <div className="skeleton-shimmer absolute inset-0" /> : null}
-
         <AnimatePresence mode="wait">
           <motion.div
             key={photo.id}
             className="relative h-[min(72vh,900px)] w-full max-w-6xl px-4 sm:px-8"
-            initial={{ opacity: 0, x: 24 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -24 }}
-            transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
+            <GalleryImage
               src={photo.fullUrl}
               alt={photo.originalName}
-              className={`h-full w-full object-contain transition-opacity duration-300 ${
-                loaded ? "opacity-100" : "opacity-0"
-              }`}
-              onLoad={() => setLoaded(true)}
+              priority
+              className="h-full w-full object-contain"
             />
           </motion.div>
         </AnimatePresence>
@@ -113,7 +102,7 @@ export function PhotoSlideshow({ photos }: { photos: GalleryPhoto[] }) {
                   : "border-border opacity-60 hover:opacity-100"
               }`}
             >
-              <LazyGalleryImage
+              <GalleryImage
                 src={thumb.url}
                 alt={thumb.originalName}
                 priority={Math.abs(thumbIndex - index) <= 2}
