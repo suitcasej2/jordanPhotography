@@ -8,7 +8,30 @@ type RouteContext = {
   params: Promise<{ id: string }>;
 };
 
-const BATCH_SIZE = 8;
+const BATCH_SIZE = 16;
+const BACKFILL_CONCURRENCY = 4;
+
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  concurrency: number,
+  fn: (item: T) => Promise<R>,
+) {
+  const results: R[] = [];
+  let nextIndex = 0;
+
+  async function worker() {
+    while (nextIndex < items.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      results[index] = await fn(items[index]);
+    }
+  }
+
+  await Promise.all(
+    Array.from({ length: Math.min(concurrency, items.length) }, () => worker()),
+  );
+  return results;
+}
 
 export async function POST(_request: Request, context: RouteContext) {
   if (!(await hasAdminSession())) {
@@ -32,7 +55,7 @@ export async function POST(_request: Request, context: RouteContext) {
 
   let processed = 0;
 
-  for (const photo of missing) {
+  await mapWithConcurrency(missing, BACKFILL_CONCURRENCY, async (photo) => {
     try {
       const buffer = await readPhotoFile(photo);
       const previewBuffer = await generatePreviewBuffer(buffer);
@@ -46,7 +69,7 @@ export async function POST(_request: Request, context: RouteContext) {
     } catch {
       // Skip photos that cannot be converted
     }
-  }
+  });
 
   const remaining = await prisma.photo.count({
     where: { catalogId: id, previewFilename: null },

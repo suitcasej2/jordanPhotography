@@ -42,7 +42,7 @@ export async function GET(_request: Request, context: RouteContext) {
   }
 
   const publicCatalog = toPublicCatalog(catalog);
-  const photos = await withPresignedPhotoUrls(catalog.photos);
+  const photos = await withPresignedPhotoUrls(catalog.photos, { previewsOnly: true });
 
   return NextResponse.json({
     ...publicCatalog,

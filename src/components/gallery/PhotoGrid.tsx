@@ -2,8 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { FadeInItem, FadeInStagger } from "@/components/motion/FadeIn";
-import { ProtectedImage } from "@/components/ui/ProtectedImage";
+import { LazyGalleryImage, useBlobPreconnect } from "@/components/gallery/LazyGalleryImage";
 import { prefetchImage } from "@/lib/download-gallery-zip";
 
 export type GalleryPhoto = {
@@ -15,6 +14,7 @@ export type GalleryPhoto = {
   url: string;
   fullUrl: string;
   downloadUrl: string;
+  hasPreview?: boolean;
 };
 
 function PhotoTile({
@@ -32,37 +32,33 @@ function PhotoTile({
     photo.width && photo.height ? photo.width / photo.height : 3 / 4;
 
   return (
-    <FadeInItem>
-      <button
-        type="button"
-        onClick={() => onOpen(index)}
-        className="group relative mb-4 w-full break-inside-avoid overflow-hidden rounded-sm bg-surface text-left"
-        style={{ aspectRatio: aspect }}
-      >
-        {!loaded && !failed ? (
-          <div className="skeleton-shimmer absolute inset-0" />
-        ) : null}
-        {failed ? (
-          <div className="absolute inset-0 flex items-center justify-center text-xs text-muted">
-            Unable to load
-          </div>
-        ) : (
-          <ProtectedImage
-            src={photo.url}
-            alt={photo.originalName}
-            fill
-            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-            className={`object-cover transition duration-500 ease-out group-hover:scale-[1.02] ${
-              loaded ? "opacity-100" : "opacity-0"
-            }`}
-            onLoad={() => setLoaded(true)}
-            onError={() => setFailed(true)}
-            priority={index < 6}
-          />
-        )}
-        <div className="pointer-events-none absolute inset-0 bg-black/0 transition group-hover:bg-black/10" />
-      </button>
-    </FadeInItem>
+    <button
+      type="button"
+      onClick={() => onOpen(index)}
+      className="group relative mb-4 w-full break-inside-avoid overflow-hidden rounded-sm bg-surface text-left"
+      style={{ aspectRatio: aspect }}
+    >
+      {!loaded && !failed ? (
+        <div className="skeleton-shimmer absolute inset-0" />
+      ) : null}
+      {failed ? (
+        <div className="absolute inset-0 flex items-center justify-center text-xs text-muted">
+          Unable to load
+        </div>
+      ) : (
+        <LazyGalleryImage
+          src={photo.url}
+          alt={photo.originalName}
+          priority={index < 4}
+          className={`h-full w-full object-cover transition duration-500 ease-out group-hover:scale-[1.02] ${
+            loaded ? "opacity-100" : "opacity-0"
+          }`}
+          onLoad={() => setLoaded(true)}
+          onError={() => setFailed(true)}
+        />
+      )}
+      <div className="pointer-events-none absolute inset-0 bg-black/0 transition group-hover:bg-black/10" />
+    </button>
   );
 }
 
@@ -78,6 +74,7 @@ function Lightbox({
   onNavigate: (next: number) => void;
 }) {
   const photo = photos[index];
+  const [loaded, setLoaded] = useState(false);
 
   const handleKey = useCallback(
     (event: KeyboardEvent) => {
@@ -87,6 +84,10 @@ function Lightbox({
     },
     [index, onClose, onNavigate, photos.length],
   );
+
+  useEffect(() => {
+    setLoaded(false);
+  }, [photo.id]);
 
   useEffect(() => {
     document.body.style.overflow = "hidden";
@@ -138,14 +139,13 @@ function Lightbox({
         transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
         onClick={(e) => e.stopPropagation()}
       >
-        <ProtectedImage
+        {!loaded ? <div className="skeleton-shimmer absolute inset-0" /> : null}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
           src={photo.fullUrl}
           alt={photo.originalName}
-          fill
-          className="object-contain"
-          sizes="100vw"
-          priority
-          fullResolution
+          className={`h-full w-full object-contain ${loaded ? "opacity-100" : "opacity-0"}`}
+          onLoad={() => setLoaded(true)}
         />
       </motion.div>
 
@@ -180,10 +180,11 @@ function Lightbox({
 
 export function PhotoGrid({ photos }: { photos: GalleryPhoto[] }) {
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  useBlobPreconnect(photos.map((photo) => photo.url));
 
   return (
     <>
-      <FadeInStagger className="columns-1 gap-4 sm:columns-2 lg:columns-3">
+      <div className="columns-1 gap-4 sm:columns-2 lg:columns-3">
         {photos.map((photo, index) => (
           <PhotoTile
             key={photo.id}
@@ -192,7 +193,7 @@ export function PhotoGrid({ photos }: { photos: GalleryPhoto[] }) {
             onOpen={setLightboxIndex}
           />
         ))}
-      </FadeInStagger>
+      </div>
 
       <AnimatePresence>
         {lightboxIndex !== null ? (

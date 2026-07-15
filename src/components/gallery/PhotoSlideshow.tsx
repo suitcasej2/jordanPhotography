@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { ProtectedImage } from "@/components/ui/ProtectedImage";
+import { LazyGalleryImage, useBlobPreconnect } from "@/components/gallery/LazyGalleryImage";
 import type { GalleryPhoto } from "@/components/gallery/PhotoGrid";
 import { prefetchImage } from "@/lib/download-gallery-zip";
 
@@ -10,6 +10,7 @@ export function PhotoSlideshow({ photos }: { photos: GalleryPhoto[] }) {
   const [index, setIndex] = useState(0);
   const [loaded, setLoaded] = useState(false);
   const photo = photos[index];
+  useBlobPreconnect(photos.map((item) => item.url));
 
   const goTo = useCallback(
     (next: number) => {
@@ -50,16 +51,13 @@ export function PhotoSlideshow({ photos }: { photos: GalleryPhoto[] }) {
             exit={{ opacity: 0, x: -24 }}
             transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
           >
-            <ProtectedImage
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
               src={photo.fullUrl}
               alt={photo.originalName}
-              fill
-              className={`object-contain transition-opacity duration-300 ${
+              className={`h-full w-full object-contain transition-opacity duration-300 ${
                 loaded ? "opacity-100" : "opacity-0"
               }`}
-              sizes="100vw"
-              priority
-              fullResolution
               onLoad={() => setLoaded(true)}
             />
           </motion.div>
@@ -115,12 +113,11 @@ export function PhotoSlideshow({ photos }: { photos: GalleryPhoto[] }) {
                   : "border-border opacity-60 hover:opacity-100"
               }`}
             >
-              <ProtectedImage
+              <LazyGalleryImage
                 src={thumb.url}
                 alt={thumb.originalName}
-                fill
-                className="object-cover"
-                sizes="64px"
+                priority={Math.abs(thumbIndex - index) <= 2}
+                className="h-full w-full object-cover"
               />
             </button>
           ))}

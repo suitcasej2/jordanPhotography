@@ -17,6 +17,7 @@ type CatalogDetail = {
   clientName?: string | null;
   expiresAt: string;
   coverPhotoId: string | null;
+  missingPreviewCount?: number;
   photos: Array<{
     id: string;
     originalName: string;
@@ -33,6 +34,7 @@ export function CatalogManager({ catalogId }: { catalogId: string }) {
   const [uploading, setUploading] = useState(false);
   const [finishing, setFinishing] = useState(false);
   const [optimizing, setOptimizing] = useState(false);
+  const [previewsRemaining, setPreviewsRemaining] = useState(0);
 
   const loadCatalog = useCallback(async () => {
     setLoading(true);
@@ -47,6 +49,7 @@ export function CatalogManager({ catalogId }: { catalogId: string }) {
 
       const data = (await response.json()) as CatalogDetail;
       setCatalog(data);
+      setPreviewsRemaining(data.missingPreviewCount ?? 0);
     } catch {
       setCatalog(null);
     } finally {
@@ -74,9 +77,14 @@ export function CatalogManager({ catalogId }: { catalogId: string }) {
           const data = (await response.json()) as {
             done?: boolean;
             processed?: number;
+            remaining?: number;
           };
 
-          if (!response.ok || data.done || !data.processed) {
+          if (!response.ok) break;
+          if (typeof data.remaining === "number") {
+            setPreviewsRemaining(data.remaining);
+          }
+          if (data.done || !data.processed) {
             break;
           }
         }
@@ -159,7 +167,9 @@ export function CatalogManager({ catalogId }: { catalogId: string }) {
             <p className="mt-2 text-sm text-muted">
               {catalog.photos.length} photos · {daysLeft} days remaining · /gallery/
               {catalog.slug}
-              {optimizing ? " · Optimizing photos for faster loading…" : null}
+              {optimizing && previewsRemaining > 0
+                ? ` · Optimizing ${previewsRemaining} photos for faster loading…`
+                : null}
             </p>
           </div>
           <div className="flex shrink-0 flex-col items-end gap-2">
