@@ -22,6 +22,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     return {
       title: "Gallery unavailable",
       description: "This gallery is no longer available.",
+      robots: { index: false, follow: false },
     };
   }
 
@@ -34,6 +35,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   return {
     title: catalog.title,
     description,
+    // Private client galleries are share-only — never indexed by search engines.
+    robots: { index: false, follow: false, nocache: true },
     openGraph: {
       title: catalog.title,
       description,
