@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { siteConfig } from "@/lib/site-config";
 
 export function BookingFooter() {
@@ -6,7 +5,7 @@ export function BookingFooter() {
     siteConfig;
 
   return (
-    <footer className="border-t border-border/60 bg-background">
+    <footer id="booking" className="border-t border-border/60 bg-background">
       <div className="mx-auto flex max-w-7xl flex-col gap-8 px-6 py-12 sm:flex-row sm:items-end sm:justify-between">
         <div className="max-w-md">
           <p className="text-xs tracking-[0.35em] uppercase text-accent">
@@ -37,11 +36,8 @@ export function BookingFooter() {
       </div>
 
       <div className="border-t border-border/40 px-6 py-5">
-        <div className="mx-auto flex max-w-7xl flex-col items-start justify-between gap-2 text-xs tracking-[0.15em] uppercase text-muted sm:flex-row sm:items-center">
+        <div className="mx-auto max-w-7xl text-xs tracking-[0.15em] uppercase text-muted">
           <p>{photographerName} · Documentary Photography</p>
-          <Link href="/admin" className="transition hover:text-foreground">
-            Studio
-          </Link>
         </div>
       </div>
     </footer>

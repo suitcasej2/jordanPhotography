@@ -8,6 +8,8 @@ const fadeUp = {
   visible: { opacity: 1, y: 0 },
 };
 
+const easeOut = [0.22, 1, 0.36, 1] as const;
+
 export function FadeIn({
   children,
   delay = 0,
@@ -23,7 +25,30 @@ export function FadeIn({
       initial="hidden"
       animate="visible"
       variants={fadeUp}
-      transition={{ duration: 0.45, delay, ease: [0.22, 1, 0.36, 1] }}
+      transition={{ duration: 0.45, delay, ease: easeOut }}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+export function Reveal({
+  children,
+  delay = 0,
+  className,
+}: {
+  children: ReactNode;
+  delay?: number;
+  className?: string;
+}) {
+  return (
+    <motion.div
+      className={className}
+      initial="hidden"
+      whileInView="visible"
+      viewport={{ once: true, amount: 0.2 }}
+      variants={fadeUp}
+      transition={{ duration: 0.55, delay, ease: easeOut }}
     >
       {children}
     </motion.div>

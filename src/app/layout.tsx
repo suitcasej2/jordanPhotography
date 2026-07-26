@@ -34,8 +34,9 @@ const bookingFont = Cormorant_Garamond({
 });
 
 export const metadata: Metadata = {
-  title: "Jordan Photo Share",
-  description: "Private client galleries for documentary photography.",
+  title: "Jordan — Documentary Photography",
+  description:
+    "Documentary photography for events, workshops, and editorial stories. Private client galleries delivered with care.",
 };
 
 export default function RootLayout({
